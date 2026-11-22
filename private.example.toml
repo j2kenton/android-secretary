@@ -1,0 +1,105 @@
+# Copy to private.toml (git-ignored) and make it yours. Everything personal lives
+# here: rules.toml refers to these tables as @table (and to [contacts] as @alias).
+# All names, numbers and groups below are made up.
+
+# Phone numbers, by alias: `from = ["@child"]` in a rule.
+[contacts]
+child = ["+972500000000"]
+
+# Calendar title prefixes: a text addressed to this name gets "<prefix>: ".
+[people]
+"Dana" = "D"
+
+# A line about you for Claude's prompts (where you live, languages, family, work). Optional.
+[owner]
+about = "Lives in the city; has kids; works in tech."
+
+# Roughly where you are, for the weather and quiet times: a town centre, not your address.
+[location]
+lat = 32.08
+lon = 34.78
+
+# Quiet times: no alerts, reminders wait, and a summary when it ends. Optional.
+# [quiet]
+# shabbat = true          # a weekly quiet time, worked out from [location]
+
+# Class WhatsApp groups (part of the group name is enough) and the school app.
+[school]
+groups = ["Grade 1 Parents", "Grade 10 Updates"]
+forward_to = "Partner"                     # school cards offer "↪ Partner" (a contact name as the phone shows it)
+apps = { "com.mashov.main" = "Mashov" }
+kids = "Noa: grade 1. Ari: grade 10. Ben: kindergarten."
+
+# Per class group: who its items go to.
+[school.forward]
+"Grade 10 Updates" = { contact = "Ari Mobile", label = "Ari" }
+
+# How each class is named in forwards ("Noa · Grade 1: ...").
+[school.labels]
+"Grade 1 Parents" = "Noa · Grade 1"
+"Grade 10 Updates" = "Ari · Grade 10"
+
+# Items needing a parent's approval open the school app.
+[school.approval]
+match = ["Grade 10"]
+app = "com.mashov.main"
+label = "📲 Approve in Mashov"
+
+# Other WhatsApp groups and Telegram channels you don't read: what's worth surfacing from each kind.
+# Groups get a profile automatically (or by asking); also built in: school, active.
+[groups]
+kids = "Noa: grade 1. Ari: grade 10. Ben: kindergarten."
+# prayer_times = true     # groups that post a weekly schedule: keep it, and answer questions about it from it
+# never_fits = """Adults-only events are "" too"""   # offers that never fit the family, said to Claude as is
+
+[groups.profiles]
+news = "News groups, channels and bots. A card only for something that affects the owner today (a closure, a strike, a security alert); the rest at most a summary line."
+building = "The owner's apartment building group. Cards for water or power cuts and the lift; ignore chatter."
+
+# Cards from groups of this profile get "↪ <contact>" instead of "💬 Open".
+[groups.forward]
+news = "Partner"
+
+# The secretary: decisions from reviews (it stops suggesting rules for these), senders
+# whose greeting-only texts are just marked read, senders that never get a card, and
+# apps judged post by post.
+[secretary]
+decided = ["Calendar: nothing is ever added by itself; things to schedule are checked against the calendars and offered on a card."]
+greetings_only = ["Aunt Vera"]
+summary_max = ["KIDZONE"]
+
+[secretary.judge]
+"com.facebook.katana" = """Facebook. The default is "clear"; a line only for something addressed to the owner personally."""
+
+# Whose clearly urgent messages open their chat at once with a loud card (maybe urgent: the same,
+# silently). Key: the contact name as the phone shows it; label: on the card and said aloud.
+# Anyone else in the contacts gets only a silent card, and only when it's certainly urgent.
+[urgent.people]
+"Partner" = { label = "Dana", who = "their partner" }
+"Ari Mobile" = { label = "Ari", who = "their son Ari (grade 10)" }
+
+# Your calendars, by the phone's calendar ids (adb shell content query --uri
+# content://com.android.calendar/calendars). Read only.
+[calendars]
+Personal = 1
+Family = 2
+
+# Copying Personal events to Family (no reminders on the copy): Google calendar ids.
+[calendar_copy]
+personal = "you@example.com"
+family = "family-calendar-id@group.calendar.google.com"
+skip = ["RENEW PASSPORT"]
+days = 90
+
+# Mailing lists read as one daily line instead of email by email.
+[email_lists."green hills"]
+on = false
+name = "green hills"                       # the sender's name on Gmail's notification
+from = "greenhills.list@example.com"
+label = "Green Hills"
+owner = "Dana Cohen"
+
+# Words that must never appear in the public code: tests/test_no_private.py checks every
+# tracked file for these, and for the names, numbers and email addresses in the tables above.
+[public_check]
+terms = ["Cohen"]

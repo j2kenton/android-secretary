@@ -1,0 +1,6 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Termux:Boot script: brings the phone-automations daemon back up after the phone starts.
+# Install once (Termux:Boot must be installed and opened once):
+#   mkdir -p ~/.termux/boot && cp boot/start-automations ~/.termux/boot/ && chmod +x ~/.termux/boot/start-automations
+termux-wake-lock
+exec /data/data/com.termux/files/home/phone-automations/bin/automations start

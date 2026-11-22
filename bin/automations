@@ -1,0 +1,69 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Control the automations daemon. Works from Termux or from the proot distro:
+# the daemon always runs natively in Termux, in a tmux session of its own,
+# so it keeps running when the shell or Claude session that started it ends.
+#
+#   bin/automations start | stop | restart | status | logs | doctor | validate | replay | fire RULE | groups | assign | resolve
+#   bin/automations termux COMMAND...   # run COMMAND natively in Termux (from Ubuntu too) and wait for it
+set -euo pipefail
+
+PREFIX=/data/data/com.termux/files/usr
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SESSION=automations
+TMUX_BIN=$PREFIX/bin/tmux
+PY=$PREFIX/bin/python3
+
+# Termux's tmux server socket, found by path so this also works inside proot.
+sock() {
+  local s
+  s=$(ls -d "$PREFIX"/var/run/tmux-*/default 2>/dev/null | head -n 1 || true)
+  [ -n "$s" ] && echo "-S $s" || echo ""
+}
+tm() { "$TMUX_BIN" $(sock) "$@"; }
+running() { tm has-session -t "$SESSION" 2>/dev/null; }
+# Keep the caller's environment: Termux:API hangs without the ANDROID_* variables.
+in_proot() { case "$(uname -r)" in *PRoot*) return 0 ;; esac; return 1; }
+# Run a command natively in Termux and wait for it, showing its output. From Ubuntu
+# (where Claude Code runs) this goes through Termux's own tmux server, the only way
+# to reach Termux's packages and Termux:API's permissions from there.
+termux_run() {
+  if ! in_proot; then (cd "$ROOT" && "$@"); return; fi
+  local s; s=$(ls -d "$PREFIX"/var/run/tmux-*/default 2>/dev/null | head -n 1 || true)
+  if [ -z "$s" ]; then
+    echo "Termux's tmux isn't running, so this can't reach Termux from Ubuntu. In a Termux" >&2
+    echo "session (not Ubuntu), run it there instead: cd '$ROOT' && $*" >&2
+    echo "(Or start Claude Code inside tmux next time: README, Claude Code on the phone.)" >&2
+    return 1
+  fi
+  mkdir -p "$ROOT/var"; local out="$ROOT/var/termux-run.$$" cmd="" a
+  for a in "$@"; do cmd+=" $(printf '%q' "$a")"; done
+  rm -f "$out.log" "$out.rc"; : > "$out.log"
+  "$TMUX_BIN" -S "$s" new-session -d -s "termux-run-$$" \
+    "cd '$ROOT' && { $cmd; } > '$out.log' 2>&1 < /dev/null; echo \$? > '$out.rc'"
+  tail -n +1 -f "$out.log" & local tp=$!
+  while [ ! -f "$out.rc" ]; do sleep 1; done
+  sleep 1; kill "$tp" 2>/dev/null || true; wait "$tp" 2>/dev/null || true
+  local rc; rc=$(cat "$out.rc"); rm -f "$out.log" "$out.rc"; return "$rc"
+}
+py() { (cd "$ROOT" && PREFIX=$PREFIX PATH="$PREFIX/bin:$PATH" "$PY" -m automations "$@"); }
+
+case "${1:-status}" in
+  start)
+    if running; then echo "already running"; exit 0; fi
+    py validate >/dev/null
+    tm new-session -d -s "$SESSION" \
+      "cd '$ROOT' && $PREFIX/bin/termux-wake-lock; exec env PREFIX=$PREFIX PATH=$PREFIX/bin:\$PATH $PY -m automations run"
+    sleep 2; running && echo "started" || { echo "failed to start; see var/automations.log"; exit 1; }
+    ;;
+  stop)     running && tm kill-session -t "$SESSION" && echo "stopped" || echo "not running" ;;
+  restart)  "$0" stop; "$0" start ;;
+  status)
+    running && echo "running" || echo "not running"
+    tail -n 5 "$ROOT/var/automations.log" 2>/dev/null || true
+    ;;
+  logs)     tail -n "${2:-40}" "$ROOT/var/automations.log" ;;
+  doctor)   if in_proot; then termux_run "$ROOT/bin/automations" doctor; else py doctor; fi ;;
+  termux)   shift; termux_run "$@" ;;
+  validate|replay|fire|groups|assign|resolve|seen|remind|sms|idea|calcopy) shift_cmd=$1; shift; py "$shift_cmd" "$@" ;;
+  *) echo "usage: $0 start|stop|restart|status|logs|doctor|termux COMMAND...|validate|replay|fire RULE|groups|assign GROUP PROFILE|resolve N|seen|remind NID WHEN|sms NUMBER TEXT|idea yes|no NID|calcopy yes|no ID"; exit 2 ;;
+esac

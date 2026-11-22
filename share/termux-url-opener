@@ -1,0 +1,9 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Share -> Termux: Termux runs ~/bin/termux-url-opener with the shared link.
+# This only saves the link for Claude to read (bin/phone inbox) and confirms
+# with a toast. It opens nothing.
+# Install: mkdir -p ~/bin && cp share/termux-url-opener ~/bin/ && chmod +x ~/bin/termux-url-opener
+INBOX=/data/data/com.termux/files/home/phone-automations/var/shared.tsv
+mkdir -p "$(dirname "$INBOX")"
+printf '%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$INBOX"
+termux-toast "Saved for Claude"

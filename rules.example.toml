@@ -1,0 +1,471 @@
+# Phone automations: when an event matches a rule, its actions run in order.
+# Field reference: automations/rules.py. Sources: sms, notification, clock.
+# Actions: see ACTIONS in automations/actions.py.
+#
+# This is an example: copy it to rules.toml (git-ignored) and make it yours.
+# Everything personal (names, numbers, groups, decisions) goes in private.toml
+# (git-ignored too, see private.example.toml); refer to it as @table or @alias.
+# Rules whose @tables you don't have yet: delete them or fill the tables in.
+#
+# After editing: `bin/automations validate`, then `bin/automations restart`.
+
+[settings]
+poll_seconds = 10
+in_use_poll_seconds = 3     # screen on and unlocked: check more often, and `soon` rules act at once
+
+# A child texts "Can I have (some/more) time please?" when they want more screen
+# time. Open Family Link so the request is right there to approve or not,
+# and leave a card to answer in one tap (it texts only when tapped).
+[[rule]]
+name = "child-asks-for-screen-time"
+source = "sms"
+from = ["@child"]
+contains_any = ["time", "זמן"]
+cooldown_seconds = 60
+actions = [
+  { type = "open_app", package = "com.google.android.apps.kids.familylink", fallback_title = "{contact} wants more time" },
+  { type = "reply_card", title = "{contact} asked for more time", replies = [
+      { label = "📤 Send “Done! 🙂”", text = "Done! 🙂" },
+  ] },
+]
+
+# Booked-appointment texts (clinics, the post office, ...): a card
+# with "Add to calendar" that opens the calendar's new-event screen prefilled.
+# Nothing is saved until you tap Save. Past, cancelled and repeat reminders
+# for the same time are skipped (automations/extract.py does the parsing).
+[[rule]]
+name = "appointment-to-calendar"
+source = "sms"
+regex = "תור|appointment"
+# Titles get "J: " only when the text is addressed to you by name (private.toml [people]).
+actions = [{ type = "calendar_card", duration_minutes = 30, title_prefixes = "@people", calendars = "@calendars" }]
+
+# The same for appointments that arrive on WhatsApp (some clinics and services
+# use it). Only the notification text is visible, so a cut-off message may be
+# missed; ordinary chats never match (it needs a booked appointment with date and time).
+[[rule]]
+name = "whatsapp-appointment-to-calendar"
+source = "notification"
+package = "com.whatsapp"
+regex = "תור|appointment"
+actions = [{ type = "calendar_card", duration_minutes = 30, title_prefixes = "@people", calendars = "@calendars" }]
+
+# A declined or failed card charge: a loud card that stays until dismissed,
+# with a button for the bank's link if the text has one.
+[[rule]]
+name = "card-declined"
+source = "sms"
+regex = "לא אושרה עסקה|נדחתה|סורבה|charge failed|declined"
+
+[[rule.actions]]
+type = "alert_card"
+extract = "declined_charge"
+title = "⚠ Card declined: {amount} at {merchant}"
+fallback_title = "⚠ Card payment failed ({contact})"
+
+# The clinic asks "to confirm press 1, to cancel press 5". One tap texts "1";
+# there is deliberately no cancel button - use Open chat for that.
+[[rule]]
+name = "confirm-appointment"
+source = "sms"
+regex = "לאישור התור.{0,20}(להקיש|הקש)\\s*1"
+
+[[rule.actions]]
+type = "reply_card"
+extract = "appointment"
+title = "Confirm {appt_title}? {appt_when}"
+fallback_title = "Confirm your appointment? ({contact})"
+open_chat_label = "💬 Open chat"
+replies = [{ label = "📤 Send “1” (confirm)", text = "1" }]
+
+# Every morning at 05:00 and again at 06:10 (before a 06:15 alarm): one card,
+# one line per item. (With a weekly quiet time, leave that day out here and
+# use the after-quiet summary below.) Email isn't in it: Gmail's own
+# notifications stay as they are (they can't be marked read
+# from here, so a copy only doubles them); an email gets a card of ours only
+# for an action Gmail lacks (calendar, a school approval), via the secretary.
+# The 06:10 card replaces the 05:00 one. No card if nothing is waiting.
+# Service and status notifications are left out; add to the lists if
+# something noisy gets through. It reads only; it dismisses nothing.
+[[rule]]
+name = "morning-summary"
+source = "clock"
+at = ["05:00", "06:10"]
+days = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+
+[[rule.actions]]
+type = "notification_digest"
+ensemble_status = false               # true: one live 🤖 line for Ensemble (see the Ensemble rules below)
+school = "@school"                    # 🏫 today/tomorrow school items, with labels and forward buttons
+noise = "@noise"
+ignore_packages = ["com.google.android.gm"]   # Gmail: its notifications are the summary
+weather = { lat = 32.08, lon = 34.78 }   # your town centre (here Tel Aviv), not your address: a line; a card if out of the ordinary
+
+# The same summary as soon as a quiet time ends (private.toml [quiet]; with
+# e.g. shabbat = true, as soon as it ends, worked out each week from [location]).
+# Tomorrow's weather. Without quiet times it never runs.
+[[rule]]
+name = "after-quiet-summary"
+source = "clock"
+every = 2
+
+[[rule.actions]]
+type = "after_quiet"
+school = "@school"
+noise = "@noise"
+ignore_packages = ["com.google.android.gm"]
+weather = { lat = 32.08, lon = 34.78 }
+
+# The evening news round-up: group news that's clearly
+# not time-sensitive ("daily" lines) waits for the 📰 card at the morning
+# summaries and here, at 18:00.
+[[rule]]
+name = "news-roundup"
+source = "clock"
+at = ["18:00"]
+
+[[rule.actions]]
+type = "news_roundup"
+
+# Personal events with no copy in the Family calendar: asked about first (✅
+# Copy / ✋ Don't copy), then copied with no reminders (the owner needs the
+# reminder, the family just needs to know). Every 3 hours by day, never
+# in a quiet time; on demand: `bin/automations fire calendar-copy`.
+# See automations/calendar_copy.py.
+[[rule]]
+name = "calendar-copy"
+source = "clock"
+at = ["07:30", "10:30", "13:30", "16:30", "19:30", "22:30"]
+
+[[rule.actions]]
+type = "calendar_copy"
+calendars = "@calendars"
+copy_cfg = "@calendar_copy"
+
+# Friday midday (the weekend starts on Friday): up to three 💡 cards, ideas for
+# new automations from the week's notifications, each with "✅ Build it" (types
+# it into the Claude session; nothing changes without the owner) and "✋ No
+# thanks" (not suggested again). See automations/ideas.py.
+[[rule]]
+name = "weekly-ideas"
+source = "clock"
+at = ["12:00"]
+days = ["fri"]
+
+[[rule.actions]]
+type = "weekly_ideas"
+secretary_cfg = "@secretary"
+
+# Cards with "⏰ Remind me tonight / tomorrow" (school items, for now) come
+# back at their time: 19:30, or 06:10 with the morning summary; never in a
+# quiet time (just after it instead). See automations/reminders.py.
+[[rule]]
+name = "reminders"
+source = "clock"
+
+[[rule.actions]]
+type = "reminders_due"
+
+# Weather during the day: a card only when something new and significant turns
+# up (rain now likely in the hours ahead, a big swing, heat, storm). The
+# Samsung weather notification itself is cleared (see [clear]); the cards open
+# the weather app.
+[[rule]]
+name = "weather-watch"
+source = "clock"
+every = 60
+
+[[rule.actions]]
+type = "weather_watch"
+lat = 32.08
+lon = 34.78
+school = "@school"                   # its forward_to: "↪ Forward to …" (e.g. a partner) on the card
+
+# Card rule everywhere: anything with an action, or important, gets a card of
+# its own; only purely informational lists share one card.
+#
+# School WhatsApp groups (private.toml [school] groups), which the owner keeps
+# silent and doesn't read: every message is saved and its notification
+# snoozed out of the shade (needs adb). Every 5 minutes, if any came in, Claude
+# (no tools, only those messages) picks out what a parent must act on (food,
+# things to bring, clothes, schedule, pickup, closures, forms, trips, tests),
+# dated. Each item gets a card of its own with "↪ Send to <forward_to>": it
+# opens WhatsApp to that contact with the teacher's message typed in, for the
+# owner to send (school stuff is mostly a reminder to pass on). Today/tomorrow
+# items come back on the morning card.
+[[rule]]
+name = "school-collect"
+source = "notification"
+package = "com.whatsapp"
+
+[[rule.actions]]
+type = "school_collect"
+school = "@school"
+
+[[rule]]
+name = "school-digest"
+source = "clock"
+every = 5
+soon = true                          # phone in use: right away
+
+[[rule.actions]]
+type = "school_digest"
+school = "@school"
+
+# The school app (private.toml [school] apps: absence and behaviour
+# notes) goes through the same digest: notes into the 🏫 School summary card,
+# then its notification is cleared; one that needs something done (sign, answer,
+# time-sensitive) gets a card and its notification stays, to tap through.
+[[rule]]
+name = "school-app-collect"
+source = "notification"
+
+[[rule.actions]]
+type = "school_app_collect"
+school = "@school"
+
+# Spam SMS: Truecaller's warning stays (it's the protection); the same SMS in
+# the Messages app is marked read (its own "Mark as read", via Tasker), since
+# two copies aren't needed. Either can arrive first, so both trigger it.
+[[rule]]
+name = "spam-sms-dedupe"
+source = "notification"
+
+[[rule.actions]]
+type = "spam_dedupe"
+
+# Ensemble (a VS Code multi-agent extension, run on a cloud box reached by ssh):
+# off here; switch these on only if you use it. One card that says its state first (🔴 needs you / 🟢 running /
+# ⚪ stopped), checked live on the box (read-only) whenever Ensemble pushes a
+# notification, and every 5 minutes in case a run dies silently. Ensemble's own
+# ntfy notification is cleared: this card replaces it. Alerts only on a change
+# to "needs you".
+[[rule]]
+name = "ensemble-on-push"
+enabled = false
+source = "notification"
+package = "io.heckel.ntfy"
+regex = '^(?!Listening for incoming|Waiting for network)'   # ntfy's own status notices aren't Ensemble
+
+[[rule.actions]]
+type = "ensemble_card"
+
+[[rule]]
+name = "ensemble-every-5"
+enabled = false
+source = "clock"
+every = 5
+
+[[rule.actions]]
+type = "ensemble_card"
+
+# Other WhatsApp groups the owner doesn't read (trains, community, building,
+# news, ...). Each group has a profile saying what's worth surfacing
+# (private.toml [groups.profiles]); a new group is classified by Claude and
+# assigned only when it's sure, otherwise the owner is asked (❓ card, answered
+# in a Claude chat: `bin/automations groups`). Messages from watched groups
+# are saved and snoozed out of the shade; every 2 minutes Claude decides per
+# message: its own card (significant), the 📰 summary (still worth knowing),
+# nothing (most), or a question. "active" groups are left alone.
+[[rule]]
+name = "group-collect"
+source = "notification"
+package = "com.whatsapp"
+
+[[rule.actions]]
+type = "group_collect"
+groups = "@groups"
+school = "@school"
+
+# Telegram channels and groups (news, mostly): the same, minus WhatsApp's chat ids.
+[[rule]]
+name = "group-collect-telegram"
+source = "notification"
+package = "org.telegram.messenger"
+
+[[rule.actions]]
+type = "group_collect"
+groups = "@groups"
+school = "@school"
+
+[[rule]]
+name = "group-digest"
+source = "clock"
+every = 2                            # calls like "need one more player" can't wait; Claude runs only on new messages
+soon = true                          # phone in use: right away
+
+[[rule.actions]]
+type = "group_digest"
+groups = "@groups"
+secretary_cfg = "@secretary"   # summary_max senders: their texts count as "heard before"
+
+# Leftovers: notifications from handled groups that arrived before the group was
+# assigned (or while it was being asked about) are saved and cleared too.
+[[rule.actions]]
+type = "sweep_handled"
+school = "@school"
+
+# The secretary: every notification is queued, and every 15 minutes Claude
+# (no tools, it sees only the notification text) suggests how it could help
+# with each one: ignore, dismiss, reply, put in calendar, automate with a rule.
+# When it's confident of a good WhatsApp reply, a 💬 card offers it: one tap
+# opens the chat with the reply typed in, for you to edit and send.
+# Suggestions appear on one quiet card and in var/secretary/triaged.jsonl,
+# which a Claude session reviews to turn repeated suggestions into rules.
+# It only suggests; it never acts on a notification.
+# A clearly urgent message from someone close (private.toml [urgent]): their
+# chat opens straight away, the screen wakes, a 🚨 card with Open chat / Call,
+# and "Urgent message from …" is said on the alarm stream (through Do Not
+# Disturb). Might be urgent: the same, silently.
+# Anyone else in the contacts: only when certainly urgent, and silently even then
+# Not in quiet times. See automations/urgent.py.
+[[rule]]
+name = "urgent-from-family"
+source = "notification"
+
+[[rule.actions]]
+type = "urgent_watch"
+urgent = "@urgent"
+
+# A post office "parcel waiting" text: a 📦 card with the estimated last day,
+# the post office app (for an appointment) and "📅 Add last day"; back two
+# working days before. See automations/parcels.py.
+[[rule]]
+name = "parcel-waiting"
+source = "notification"
+
+[[rule.actions]]
+type = "parcel_watch"
+
+[[rule]]
+name = "secretary-collect"
+source = "notification"
+
+[[rule.actions]]
+type = "secretary_collect"
+noise = "@noise"
+school = "@school"                   # school and other watched groups have their own digests
+email_lists = "@email_lists"         # mailing lists read as one daily line (private.toml; each switched on with on = true)
+secretary_cfg = "@secretary"         # greetings_only: senders whose plain "שבת שלום" texts are just marked read
+
+[[rule]]
+name = "secretary-triage"
+source = "clock"
+every = 2                            # was 15: things waited up to 15 min; Claude runs only when something is queued
+soon = true                          # phone in use: right away
+
+[[rule.actions]]
+type = "secretary_triage"
+secretary_cfg = "@secretary"         # private.toml: the owner's decisions from reviews
+school = "@school"                   # [school.approval]: approvals open the school app
+calendars = "@calendars"             # schedule items: checked against these first (read only)
+email_lists = "@email_lists"         # their emails: a line on 🗂, a card for the owner's, then marked read
+groups = "@groups"                   # the kids, for the lists' offers (the WhatsApp groups' rule)
+
+# Known noise that is also cleared from the shade (snoozed) as it appears. Kept
+# short and exact on purpose: only these, never anything that could be real.
+[[rule]]
+name = "clear-noise"
+source = "notification"
+
+[[rule.actions]]
+type = "clear_noise"
+clear = "@clear"
+
+# The same over what's already on the phone (after a boot, or a snooze running out).
+[[rule]]
+name = "clear-noise-sweep"
+source = "clock"
+every = 10
+
+[[rule.actions]]
+type = "clear_noise_sweep"
+clear = "@clear"
+
+[clear]
+patterns = ['^New voicemail\n',                                               # a number not used for calls
+            '^RedAlert\n(Connecting\.\.\.|Connected to the notification service)$',  # status, never alerts
+            'is displaying over other apps\n',                                 # Android's overlay notice
+            '^\nOperating in the background - waiting to receive alerts$',      # an alerts app's status, never alerts
+            '^Listening for incoming notifications\n',                         # ntfy's own status
+            "^AutoNotification action error\nCouldn't find an action",          # a mark-read with nothing to press (logged)
+            "(?s)^Tasker Action Error\n.*Task: 'Mark Read'.*Couldn't find an action",  # the same, reported by Tasker
+            '^Google Contacts backing up \d+ of \d+ contact',
+            '\| -?\d+°.*\nHigh -?\d+° \| Low -?\d+°$',          # Samsung weather: in the morning summary instead
+            '^Termux\n\d+ sessions?',                              # Termux's own status (hiding it doesn't stop anything; tested 2026-11-13)
+            '^Auto back up\nAuto backing up',                      # Samsung Cloud backup progress
+            '^Apps slated for deep sleep\n',                       # Device care's deep-sleep list
+            '^Wispr Flow\nVoice dictation is ready$']              # Wispr's keyboard status
+# Whole apps, all spam to the owner.
+packages = ["com.instagram.barcelona",                           # Threads: never posted there; nothing in it is to them
+            "com.samsung.android.app.smartcapture",               # "Screenshot saved"
+            "com.openai.chatgpt", "com.google.android.apps.bard", "ai.x.grok"]   # AI apps: "check your chat" prompts
+# Noise only from one app.
+[clear.by_package]
+"org.telegram.messenger" = ['\njoined Telegram!?$']        # "<someone> joined Telegram!"
+"com.sec.android.app.samsungapps" = ['(?i)\bupdates? available\b']   # Galaxy Store "1 update available"
+"com.google.android.googlequicksearchbox" = ['(?i)\btry (it )?now[.!]?$']   # Google app promos ("… Try now.")
+"com.sec.android.daemonapp" = ['\d ?°']                             # any Samsung weather forecast ("Tomorrow | …: Highs 22 to 24°C"): in the summaries instead
+"com.samsung.android.incallui" = ['^Call recorded\n']                 # "Recording saved in internal storage"; calls themselves untouched
+"com.bose.bosemusic" = ['^Keeping things in sync\.']                # Bose app's always-on headphone link notice; its other notifications stay
+"com.samsung.android.forest" = ['^Check your weekly report\n']     # Digital Wellbeing's weekly nudge
+"com.linkedin.android" = ['^Missed Notifications\n']                # "See updates … you may have missed": anything important comes as its own notification
+"com.wispr.flowapp" = ['^Text copied to clipboard\n', '^Session ended\n']               # Wispr's dictation echo and 5-minute 'Session ended'
+"com.anthropic.claude" = ['^Claude is reading aloud\n']             # read-aloud player: stop it in Claude; chats' replies untouched
+"com.google.android.apps.maps" = ['^Updating offline maps\n']       # download progress
+
+# Notifications that are never news: system/status/service ones, the media
+# player, and the US-number voicemail. Used by the morning card and the secretary.
+[noise]
+packages = ["android", "com.android.systemui", "com.termux", "com.termux.api",
+            "com.sec.android.daemonapp", "com.samsung.android.app.smartcapture",
+            "io.elevenlabs.readerapp",
+            "com.samsung.android.incallui",
+            "com.anthropic.claude",   # Claude app: read-aloud, session errors
+            "com.openai.chatgpt", "com.google.android.apps.bard", "ai.x.grok",   # other AI apps: "check your chat" prompts, no card
+            "com.samsung.android.vtcamerasettings",   # camera "video effects" settings notice
+            "com.instagram.barcelona",   # Threads: feed spam, nothing is to the owner
+            "com.sec.android.app.clockpackage",   # alarms: left in the shade as they are, not news
+            "com.google.android.youtube"]   # YouTube notifications are off: anything here is what's playing   # in-call status: Calling…, Incoming call, Call recorded
+titles = ["Listening for incoming notifications", "Operating in the background",
+          "Connected to the notification service", "Backup in progress",
+          "Voice dictation is ready", "Text copied to clipboard", "Checking for new messages",
+          "is reading aloud", "displaying over other apps",
+          "New voicemail"]   # a number not used for calls
+# Exact shapes, matched against "title\ntext" (regex), where a substring would catch real messages.
+patterns = ['^WhatsApp\n\d+ messages? from \d+ chats?$',        # summary of messages shown anyway
+            '^\n?\d+ new messages?\n?$',                     # Gmail's count header ("26 new messages")
+            '^RedAlert\n(Connecting\.\.\.|Connected to the notification service)$',  # status, never alerts
+            '\nIdentified by Truecaller$',                       # caller ID for saved contacts
+            '^Waiting for network\n',                            # ntfy offline notice
+            "^AutoNotification action error\nCouldn't find an action",          # mark-read errors: the engine
+            "(?s)^Tasker Action Error\n.*Task: 'Mark Read'.*Couldn't find an action",  # checks and logs the outcome
+            '^Auto back up\nAuto backing up',                    # Samsung Cloud backup progress
+            '^Apps slated for deep sleep\n']                     # Device care's deep-sleep list
+[noise.by_package]
+"com.google.android.googlequicksearchbox" = ['(?i)\btry (it )?now[.!]?$']   # Google app promos
+"com.samsung.android.forest" = ['^Check your weekly report\n']
+"com.linkedin.android" = ['^Missed Notifications\n']
+"com.wispr.flowapp" = ['^Text copied to clipboard\n', '^Session ended\n']
+"com.anthropic.claude" = ['^Claude is reading aloud\n']
+"com.google.android.apps.maps" = ['^Updating offline maps\n']
+# App downloads, installs and updates: no card, no line; left in the shade, they go by themselves.
+"com.android.vending" = ['^[^\n]+\n$',                            # Play Store progress: the app's name, no text
+                         '(?i)\b(download(ing|ed)|install(ing|ed)|updat(ing|ed)|updates? available)\b']
+"com.sec.android.app.samsungapps" = ['(?i)\b(download(ing|ed)|install(ing|ed)|updat(ing|ed)|updates? available)\b']
+# Downloaded files: the owner taps the notification to open the file. Left as they are, no card, no line.
+"com.android.providers.downloads" = ['.']
+"com.android.chrome" = ['(?i)\bdownload']
+"com.microsoft.emmx" = ['(?i)\bdownload']
+"com.sec.android.app.sbrowser" = ['(?i)\bdownload']
+
+# Nightly encrypted backup of private.toml, var/'s decisions, Claude's memory
+# notes and the Tasker export to the repo's `backup` branch, when changed
+#. Only the owner's key opens it (see automations/backup.py).
+[[rule]]
+name = "backup"
+source = "clock"
+at = "03:00"
+
+[[rule.actions]]
+type = "backup"

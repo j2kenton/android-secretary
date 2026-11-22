@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# On-demand phone lookups (current Chrome tab, shared-links inbox). Run from the
+# proot distro / Claude session, where adb is installed. See tools/phone.py.
+exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tools/phone.py" "$@"

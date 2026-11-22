@@ -1,0 +1,89 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Set up android-secretary on this phone. SETUP.md walks through the whole setup,
+# and Claude Code can follow it for you; this script is its mechanical part.
+#
+#   bin/setup
+#
+# Safe to run again. It:
+#   - installs the Termux packages it needs,
+#   - makes private.toml and rules.toml from the examples, only if they don't exist yet
+#     (it never overwrites yours),
+#   - installs the after-reboot script (Termux:Boot) and the Share -> Termux handler,
+#     unless you already have your own,
+#   - ends with `bin/automations doctor`, which says what's still missing.
+# It doesn't start the daemon, grant a permission or change a phone setting.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+PREFIX=/data/data/com.termux/files/usr
+TERMUX_HOME=/data/data/com.termux/files/home
+# For trying the script out without touching the phone's own setup:
+INSTALL_HOME="${SETUP_INSTALL_HOME:-$TERMUX_HOME}"   # where the boot and Share scripts go
+
+# From Ubuntu (where Claude Code runs), run this in Termux itself.
+case "$(uname -r)" in *PRoot*) exec "$ROOT/bin/automations" termux "$ROOT/bin/setup" "$@" ;; esac
+
+if [ ! -d "$PREFIX" ]; then
+  echo "Run this on an Android phone, in Termux." >&2; exit 1
+fi
+case "$ROOT/" in
+  "$TERMUX_HOME"/*) ;;
+  *) echo "This folder ($ROOT) must be in Termux's home folder (for example ~/android-secretary," >&2
+     echo "cloned from Termux, not from Ubuntu): the daemon runs in Termux and can't see Ubuntu's files." >&2
+     exit 1 ;;
+esac
+
+echo "== Termux packages"
+if [ -n "${SETUP_SKIP_PACKAGES:-}" ]; then echo "(skipped)"; else
+  pkg install -y python tmux termux-api proot-distro age git
+fi
+
+echo
+echo "== Your settings and rules"
+for f in private rules; do
+  if [ -e "$ROOT/$f.toml" ]; then
+    echo "$f.toml: already there, left as it is"
+  else
+    cp "$ROOT/$f.example.toml" "$ROOT/$f.toml"
+    echo "$f.toml: made from $f.example.toml (make it yours: SETUP.md)"
+  fi
+done
+mkdir -p "$ROOT/var"
+
+# install SOURCE DEST MARKER: copy SOURCE to DEST with this folder's path filled in.
+# If DEST exists, it's replaced only when it's ours (it contains MARKER).
+install_file() {
+  local src=$1 dest=$2 marker=$3 tmp
+  tmp=$(mktemp)
+  sed "s#$TERMUX_HOME/phone-automations#$ROOT#g" "$src" > "$tmp"
+  if [ -e "$dest" ] && cmp -s "$tmp" "$dest"; then
+    echo "$dest: already installed"
+  elif [ -e "$dest" ] && ! grep -qF "$marker" "$dest"; then
+    echo "$dest: you already have your own, left as it is (see $src to combine them)"
+  else
+    mkdir -p "$(dirname "$dest")"
+    cp "$tmp" "$dest"; chmod +x "$dest"
+    echo "$dest: installed"
+  fi
+  rm -f "$tmp"
+}
+
+echo
+echo "== After a reboot, and Share -> Termux"
+install_file "$ROOT/boot/start-automations" "$INSTALL_HOME/.termux/boot/start-automations" \
+  "brings the phone-automations daemon back up"
+install_file "$ROOT/share/termux-url-opener" "$INSTALL_HOME/bin/termux-url-opener" \
+  "This only saves the link for Claude"
+
+echo
+echo "== Checking"
+"$ROOT/bin/automations" doctor || true
+
+cat <<EOF
+
+Next:
+  1. Fix anything marked ✗ above (SETUP.md says how for each).
+  2. Make private.toml and rules.toml yours (SETUP.md, step 4; Claude Code can ask
+     you the questions and fill them in).
+  3. bin/automations start
+EOF
