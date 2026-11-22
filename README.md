@@ -26,6 +26,13 @@ What it does, in short:
 - **A secretary** that suggests how each notification could be handled, so
   repeated suggestions become rules.
 
+<p>
+  <img src="screenshots/screenshot-1.png" width="360" alt="The notification shade with android-secretary's cards: a morning summary, a school item, a suggested reply, an appointment and a parcel">
+  <img src="screenshots/screenshot-2.png" width="360" alt="A school card with Forward to partner and Remind me buttons, and a message card with a suggested reply and Open with reply">
+</p>
+
+<sub>Sample cards, made-up people and places.</sub>
+
 **Nothing here approves, sends or deletes anything.** Actions only put things in
 front of the owner; anything that sends (a reply, a forward) is a button the
 owner taps, and even then the message opens for them to send.
