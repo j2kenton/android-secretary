@@ -10,9 +10,11 @@ restarts (e.g. to remember what was already offered); ignore it via **_.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import re
 import shlex
+import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -738,6 +740,8 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
         if r.get("judged"):
             done = r["keep"] == "card" or (bool(r.get("key")) and android.snooze(r["key"]))
             secretary.log_judged(r, bool(done))
+            if not done and r.get("key"):
+                retry_later(r["key"])
     _cap_to_summary(records, (secretary_cfg or {}).get("summary_max", []))
     _big_transactions(records)
     _check_calendars(records, calendars or {})
@@ -1127,7 +1131,8 @@ def _clear(event) -> None:
         log.warning("couldn't mark read %s: left in the shade", name)
         return
     if not android.snooze(key):
-        log.info("couldn't clear %s (Tasker didn't, adb not reachable)", key)
+        log.info("couldn't clear %s (Tasker didn't, adb not reachable): retried once adb is back", key)
+        retry_later(key)
         return
     _clear_orphan_summary(pkg)
 
@@ -1520,6 +1525,43 @@ def clear_noise(event, clear: dict | None = None, **_):
         log.info("cleared noise: %s", (n["title"] or n["content"])[:40])
 
 
+# Clears that failed because adb wasn't reachable (after a reboot, until Wireless
+# debugging is back on), tried again by the retry-clears rule once it is. Only
+# snoozable notifications are queued (never a chat's own: see NEVER_SNOOZE).
+RETRY_FILE = VAR / "retry-clears.json"
+
+
+def retry_later(key: str) -> None:
+    if key.split("|")[1:2] and key.split("|")[1] in android.NEVER_SNOOZE:
+        return
+    try:
+        pending = json.loads(RETRY_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        pending = {}
+    pending.setdefault(key, time.time())
+    VAR.mkdir(parents=True, exist_ok=True)
+    RETRY_FILE.write_text(json.dumps(pending), encoding="utf-8")
+
+
+def retry_clears(event, max_age_hours: float = 24, **_):
+    """Snooze what couldn't be cleared while adb was down, once adb is back.
+    Dropped when it's gone from the shade by itself, or after `max_age_hours`."""
+    try:
+        pending = json.loads(RETRY_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if not pending or android.adb_output("echo ok", timeout=20) != "ok\n":
+        return                                   # nothing queued, or adb still down: next time
+    live = {n.get("key") for n in android.notifications()}
+    for key, since in list(pending.items()):
+        if key not in live or time.time() - since > max_age_hours * 3600:
+            del pending[key]
+        elif android.snooze(key):
+            log.info("cleared once adb was back: %s", key)
+            del pending[key]
+    RETRY_FILE.write_text(json.dumps(pending), encoding="utf-8")
+
+
 def clear_noise_sweep(event, clear: dict | None = None, **_):
     """The same as clear_noise, for what's already on the phone: noise posted
     before the daemon started (boot), or that comes back when a snooze runs out
@@ -1557,6 +1599,7 @@ ACTIONS = {
     "weather_watch": weather_watch,
     "clear_noise_sweep": clear_noise_sweep,
     "sweep_handled": sweep_handled,
+    "retry_clears": retry_clears,
     "group_collect": group_collect,
     "ensemble_card": ensemble_card,
     "clear_noise": clear_noise,

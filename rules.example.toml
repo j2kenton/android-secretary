@@ -382,6 +382,16 @@ every = 10
 type = "clear_noise_sweep"
 clear = "@clear"
 
+# A clear that failed because adb wasn't reachable (after a reboot, until
+# Wireless debugging is back on) is tried again once adb is back.
+[[rule]]
+name = "retry-clears"
+source = "clock"
+every = 5
+
+[[rule.actions]]
+type = "retry_clears"
+
 [clear]
 patterns = ['^New voicemail\n',                                               # a number not used for calls
             '^RedAlert\n(Connecting\.\.\.|Connected to the notification service)$',  # status, never alerts
