@@ -99,6 +99,20 @@ class SecretaryTests(unittest.TestCase):
         left = secretary._read(secretary.QUEUE)
         self.assertEqual([(it["title"], it["tries"]) for it in left], [("Promo", 1)])
 
+    def test_reply_in_another_language_is_dropped(self):
+        """An English fragment ("( water)") got a suggested reply in Hebrew. A reply must
+        be in the message's language: one in another script is dropped, the card stays."""
+        secretary.collect(self.ev("Partner", "( water)"), NOISE, {})
+        secretary.collect(self.ev("Sam", "Are you coming?"), NOISE, {})
+        answer = "\n".join(json.dumps(d, ensure_ascii=False) for d in [
+            {"i": 0, "summary": "a fragment about water", "kind": "reply", "suggestion": "Ask what she needs",
+             "reply": "מה קרה עם המים?"},
+            {"i": 1, "summary": "asks if you're coming", "kind": "reply", "suggestion": "Answer Sam",
+             "reply": "Yes, on my way"}])
+        with mock.patch.object(secretary.claude, "ask", return_value=secretary.claude.Answer(answer, [], "")):
+            records = secretary.triage([])
+        self.assertEqual([(r["kind"], r["reply"]) for r in records], [("reply", ""), ("reply", "Yes, on my way")])
+
     def test_parse_rejects_bad_kinds_and_indexes(self):
         ans = "\n".join(json.dumps(d) for d in [
             {"i": 0, "kind": "reply", "summary": "a", "suggestion": "b"},

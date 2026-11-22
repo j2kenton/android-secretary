@@ -25,6 +25,7 @@ from pathlib import Path
 from .paths import VAR
 from . import owner
 from . import claude
+from . import script
 from . import digest as dg
 
 log = logging.getLogger("automations")
@@ -70,7 +71,8 @@ For EACH notification, output one JSON object per line (no other text, no code f
  'the owner' or 'the user'. Empty if there's nothing for them to do but read it>",
  "rule_idea": "<if this kind of notification will recur, a rule that would handle it automatically next time; else empty>",
  "reply": "<only when someone expects an answer AND you are confident of a good short reply: the reply itself, in the
-           language and tone of their message, ready to send; otherwise empty>",
+           same language as their message (an English message gets an English reply, however short; never switch to
+           another language the owner speaks) and in its tone, ready to send; otherwise empty>",
  "event": <only for kind schedule, when a date and time are known:
            {{"title": "...", "start": "YYYY-MM-DDTHH:MM", "minutes": <duration>, "location": "..."}}; otherwise null>}}
 
@@ -205,6 +207,10 @@ def triage(rule_names: list[str], model: str = "sonnet", decided: list[str] = ()
     ans = claude.ask(prompt, [], model=model, connect_wait=0)
     found = parse(ans.text, len(batch))
     records = [{**it, **found[i]} for i, it in enumerate(batch) if i in found]
+    for r in records:
+        if r.get("reply") and not script.same_language(r.get("text", ""), r["reply"]):
+            log.info("secretary: dropped a reply in another language than the message (%s)", r.get("app", ""))
+            r["reply"] = ""
     for r in records:
         if r.get("package") in judge:
             r["judged"] = True

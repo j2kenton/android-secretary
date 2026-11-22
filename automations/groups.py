@@ -23,6 +23,7 @@ from pathlib import Path
 
 from .paths import VAR
 from . import claude
+from . import script
 from . import owner
 from .school import _read, _write, clean
 
@@ -243,7 +244,8 @@ For EACH message output one JSON object per line, nothing else:
  "question": "<for ask: a short yes/no question to the owner about whether this kind of message matters to them>",
  "replies": [<for card: only when the message asks the group something the owner may answer and the answer is
              plain (a yes/no like "did the bus come?", a fact stated in these messages{times_replies}): up to 2
-             short ready-to-send replies in the message's language, the likelier first (e.g. "yes, it came", "not
+             short ready-to-send replies in the same language as the message (never switch to another language the
+             owner speaks), the likelier first (e.g. "yes, it came", "not
              yet"{times_example}).{times_answer} Never invent times, places or facts the messages don't give:
              if the asked-for time isn't there, no reply. Otherwise []>],
  "offer": <for an offer (see Offers above): {{"name": ..., "same_as": ..., "deadline": ..., "fits": ..., "must": ...}};
@@ -496,7 +498,8 @@ def digest(profiles: dict, model: str = "sonnet", kids: str = "", texted: list[s
                "line": str(d.get("line", "")).strip()[:140], "url": url if url and url in m["text"] else "",
                "title": (str(d.get("title") or "").strip() or str(d.get("line", "")).strip())[:45],
                "question": str(d.get("question", "")).strip()[:150],
-               "replies": [x.strip()[:120] for x in d.get("replies") if isinstance(x, str) and x.strip()][:2]
+               "replies": [x.strip()[:120] for x in d.get("replies")
+                           if isinstance(x, str) and x.strip() and script.same_language(m["text"], x)][:2]
                           if do == "card" and isinstance(d.get("replies"), list) else []}
         used_times = [times[k] | {"shul": k} for k in (d.get("uses_times") or []) if isinstance(k, str) and k in times]
         if rec["replies"] and used_times:
