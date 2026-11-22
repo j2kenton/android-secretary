@@ -158,8 +158,12 @@ Offer each, say what it adds, and skip any they don't want.
   `adb pair 127.0.0.1:<pairing port> <code>`, then
   `adb connect 127.0.0.1:<port shown on the Wireless debugging screen>`, then
   `adb tcpip 5555` (a fixed port, so it reconnects by itself until the next
-  reboot; after a reboot, `adb connect` again and repeat `adb tcpip 5555`).
-  Check with `bin/automations doctor`.
+  reboot). Check with `bin/automations doctor`. After a reboot, Wireless
+  debugging is off again (or on but not working: then off and on again fixes
+  it): the boot script posts a card asking them to turn it on, then reconnects
+  by itself (`bin/automations adb` does it by hand; the
+  pairing survives reboots). Suggest the **Wireless debugging** Quick Settings
+  tile (Developer options > Quick settings developer tiles) so that's one tap.
 - **Morning email check**: the morning summary can include time-sensitive
   email. It needs the Gmail connector turned on in their claude.ai settings;
   then `email = true` in the `morning-summary` rule's action, in `rules.toml`.
@@ -199,6 +203,10 @@ could then use the phone through it, and ask them to turn on two-step
 verification for that account if they haven't. Then: `/remote-control` for
 this session, or `/config` > **Enable Remote Control for all sessions**. It
 needs a claude.ai subscription (Pro, Max, Team or Enterprise), not an API key,
-and the Claude Code session must stay running on the phone. Starting it inside
-tmux keeps it running when Termux's window is closed (README). Tell them to keep
+and the Claude Code session must stay running on the phone: `bin/claude-session`
+keeps it in tmux, so it runs when Termux's window is closed. Offer to start it
+after every reboot too (`bin/setup --claude-at-boot`), and suggest
+`alias cc=<this folder>/bin/claude-session` in Termux's `~/.bashrc`. Have them
+open it once with `bin/claude-session` and answer "trust this folder?" so a
+reboot doesn't leave it waiting on that question. Tell them to keep
 permission prompts on.

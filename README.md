@@ -142,8 +142,31 @@ curl -fsSL https://claude.ai/install.sh | bash
 claude --remote-control               # log in with your claude.ai account
 ```
 
-Next time: open Termux, `tmux new -A -s claude`, `proot-distro login ubuntu`,
-`claude --remote-control` (or turn it on for every session, above).
+Next time, `bin/claude-session` (in this folder, from Termux) opens it: it
+attaches to the Claude Code session in tmux, starting it first, with Remote
+Control on. `alias cc=~/android-secretary/bin/claude-session` in Termux's
+`~/.bashrc` makes that one word.
+
+### After a reboot
+
+Nothing to type. With [Termux:Boot](https://github.com/termux/termux-boot)
+installed and opened once, `bin/setup` sets the phone up so that after a
+restart:
+
+- the daemon starts again by itself;
+- a card **🔌 Turn on Wireless debugging** appears (if you use adb). Android
+  always turns Wireless debugging off when it restarts, and only you can turn it
+  back on: tap the card for Developer options, or add the **Wireless debugging**
+  Quick Settings tile (Developer options > Quick settings developer tiles) and
+  flip it from the notification shade. If it's already on, or shows no IP
+  address and port, turn it off and on again: after a restart that's often
+  needed. Within a minute adb reconnects by itself
+  (no new pairing) and the card goes away. `bin/automations adb` does the same
+  by hand;
+- with `bin/setup --claude-at-boot`, Claude Code starts too, in tmux with Remote
+  Control on, so you can reach it from the Claude app without opening Termux.
+  The first time, open it once (`bin/claude-session`) and answer its "trust this
+  folder?" question, or it waits there after every reboot.
 
 ### By hand
 

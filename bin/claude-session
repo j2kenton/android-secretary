@@ -1,0 +1,42 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Claude Code on the phone: kept running in Termux's tmux session "claude", inside
+# the Ubuntu proot distro, with Remote Control on.
+#
+#   bin/claude-session          attach to it, starting it first if needed (what `cc` runs)
+#   bin/claude-session start    start it in the background (boot/start-claude, after a reboot)
+#   bin/claude-session status
+#
+# It starts in this folder, so Claude reads CLAUDE.md; to start somewhere else, put
+# that folder's path (as Ubuntu sees it, e.g. /root/proj) in var/claude-dir.
+# Set CLAUDE_ARGS to change the flags (default: --remote-control), CLAUDE_SESSION the tmux session.
+set -euo pipefail
+
+PREFIX=/data/data/com.termux/files/usr
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SESSION=${CLAUDE_SESSION:-claude}   # the daemon types into "claude" (ask-Claude buttons)
+TMUX_BIN=$PREFIX/bin/tmux
+DIR=$(cat "$ROOT/var/claude-dir" 2>/dev/null || echo "$ROOT")
+ARGS=${CLAUDE_ARGS:---remote-control}
+
+sock() { ls -d "$PREFIX"/var/run/tmux-*/default 2>/dev/null | head -n 1 || true; }
+tm() { local s; s=$(sock); if [ -n "$s" ]; then "$TMUX_BIN" -S "$s" "$@"; else "$TMUX_BIN" "$@"; fi; }
+running() { tm has-session -t "$SESSION" 2>/dev/null; }
+
+start() {
+  if running; then echo "Claude Code is already running (tmux session $SESSION)"; return; fi
+  # Claude Code is installed in Ubuntu by its installer (~/.local/bin) or on the PATH.
+  tm new-session -d -s "$SESSION" "export PATH=$PREFIX/bin:\$PATH; termux-wake-lock; exec $PREFIX/bin/proot-distro login ubuntu -- \
+    bash -lc 'cd $(printf %q "$DIR") && exec \"\$(command -v claude || echo \$HOME/.local/bin/claude)\" $ARGS'"
+  sleep 2
+  running && echo "Claude Code started in tmux session $SESSION ($DIR)" \
+          || { echo "Claude Code didn't start: run bin/claude-session to see why" >&2; exit 1; }
+}
+
+case "${1:-attach}" in
+  start)  start ;;
+  status) running && echo "running (tmux session $SESSION)" || echo "not running" ;;
+  attach)
+    running || start
+    if [ -n "${TMUX:-}" ]; then tm switch-client -t "$SESSION"; else exec "$TMUX_BIN" -S "$(sock)" attach -t "$SESSION"; fi ;;
+  *) echo "usage: $0 [attach|start|status]" >&2; exit 2 ;;
+esac

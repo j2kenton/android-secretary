@@ -39,6 +39,12 @@ it, and say what changed in a line or two. Setting up from scratch is in
 - `private.toml`: people, groups, decisions, settings
   (`private.example.toml` documents every table).
 - `var/`: what it remembers (decisions, logs: `var/automations.log`).
+- After a reboot (Termux:Boot, `boot/`): the daemon starts, and
+  `bin/automations adb-wait` posts a card until the owner turns Wireless
+  debugging back on, then reconnects adb. "adb isn't connected" → ask them to
+  turn it on (if it's on, off and on again), then `bin/automations adb`. Claude Code itself runs in Termux's
+  tmux session `claude` (`bin/claude-session`; `boot/start-claude` if they chose
+  it at boot).
 - Termux-only commands (Termux:API's `termux-*`, `pkg`) from Ubuntu:
   `bin/automations termux <command…>`. adb runs in Ubuntu.
 

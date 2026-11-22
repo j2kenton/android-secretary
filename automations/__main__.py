@@ -8,6 +8,7 @@
     python -m automations groups [--log N]     # WhatsApp groups: profiles, open questions, what was done
     python -m automations assign GROUP PROFILE # set a group's profile (answers a question about it)
     python -m automations resolve N            # close open question N (after handling it in chat)
+    python -m automations adb [--wait MIN]     # after a reboot: reconnect adb (Wireless debugging on)
 """
 
 from __future__ import annotations
@@ -73,12 +74,18 @@ def main(argv: list[str] | None = None) -> int:
     f = sub.add_parser("fire")
     f.add_argument("rule")
     f.add_argument("--body", default="(manual test)", help="sample message text for the test event")
+    ad = sub.add_parser("adb", help="after a reboot: reconnect adb once Wireless debugging is on")
+    ad.add_argument("--wait", type=float, default=0, metavar="MINUTES",
+                    help="keep trying this long, with a card saying what to turn on")
     a = p.parse_args(argv)
 
     setup_logging(to_file=a.cmd == "run")
     if a.cmd == "doctor":                      # works before anything is set up
         from . import doctor
         return 1 if doctor.run() else 0
+    if a.cmd == "adb":                         # after a reboot: no config needed
+        from . import adbwait
+        return adbwait.run(a.wait)
     if a.cmd == "seen":                        # from a tap: no config needed
         from . import summaries
         summaries.mark_seen(a.name, [i for i in a.ids.split(",") if i])

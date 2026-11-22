@@ -162,6 +162,106 @@ adb -s "$S" shell {shlex.quote(command)}
     return out.stdout
 
 
+# ---- reconnecting adb after a reboot ----
+# A reboot turns Wireless debugging off and forgets `adb tcpip 5555`; the pairing
+# itself survives. Once the owner turns Wireless debugging back on, its new port
+# is found over mDNS (or, failing that, by trying the local ports Android picks it
+# from), and adbd is put back on the fixed port 5555 so it stays reachable until
+# the next reboot. Nothing is accepted or paired here: a phone that was never
+# paired (SETUP.md step 5) just isn't found.
+
+ADB_FIXED = "127.0.0.1:5555"
+
+
+def _proot_bash(script: str, timeout: float) -> str | None:
+    """Run `script` with bash in the proot distro (where adb lives); its stdout, or None."""
+    try:
+        out = subprocess.run([PROOT_DISTRO, "login", "ubuntu", "--", "bash", "-c", script],
+                             capture_output=True, text=True, timeout=timeout)
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    return out.stdout if out.returncode == 0 else None
+
+
+def wifi_ip() -> str | None:
+    """This phone's address on Wi-Fi (no packets are sent), or None."""
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))
+            ip = s.getsockname()[0]
+    except OSError:
+        return None
+    return None if ip.startswith("127.") else ip
+
+
+def open_local_ports(lo: int = 30000, hi: int = 50000) -> list[str]:
+    """host:port for each port in [lo, hi) open on this phone, on 127.0.0.1 or its
+    Wi-Fi address (Wireless debugging picks its port from this range, and some
+    phones listen on Wi-Fi only)."""
+    import socket
+    from concurrent.futures import ThreadPoolExecutor
+
+    hosts = ["127.0.0.1"] + [ip for ip in [wifi_ip()] if ip]
+    targets = [(h, p) for h in hosts for p in range(lo, hi)]
+
+    def is_open(t: tuple[str, int]) -> bool:
+        with socket.socket() as s:
+            s.settimeout(0.3)
+            return s.connect_ex(t) == 0
+    with ThreadPoolExecutor(max_workers=64) as ex:
+        return [f"{h}:{p}" for (h, p), ok in zip(targets, ex.map(is_open, targets)) if ok]
+
+
+def _reconnect_script(targets: list[str], fixed_port: bool) -> str:
+    serial_file = shlex.quote(ADB_SERIAL_FILE)
+    candidates = " ".join(shlex.quote(t) for t in targets)     # (no nested quotes: Python 3.11)
+    return f"""
+first() {{ L=$(adb devices | awk 'NR>1 && $2=="device" {{print $1}}')
+  echo "$L" | grep -xF {ADB_FIXED} || echo "$L" | head -n 1; }}
+# A failed try is dropped again, so it doesn't linger as an "offline" device.
+try() {{ timeout 8 adb connect "$1" 2>&1 | grep -q '^connected\\|already connected' && return
+  adb disconnect "$1" >/dev/null 2>&1; return 1; }}
+S=$(first)
+if [ -z "$S" ]; then
+  for c in $(cat {serial_file} 2>/dev/null) {ADB_FIXED}; do try "$c"; done; S=$(first)
+fi
+if [ -z "$S" ]; then
+  for c in $(timeout 10 adb mdns services 2>/dev/null | awk '/_adb-tls-connect/ {{print $NF}}'); do
+    try "127.0.0.1:${{c##*:}}" || try "$c"
+  done; S=$(first)
+fi
+if [ -z "$S" ]; then
+  for c in {candidates}; do try "$c" && break; done; S=$(first)
+fi
+[ -n "$S" ] || exit 3
+if [ {int(fixed_port)} = 1 ] && [ "$S" != {ADB_FIXED} ]; then
+  adb -s "$S" tcpip 5555 >/dev/null 2>&1 && sleep 3
+  for i in 1 2 3 4 5; do try {ADB_FIXED} && break; sleep 2; done
+  T=$(first); [ "$T" = {ADB_FIXED} ] && S=$T
+fi
+echo "$S" > {serial_file}
+echo "$S"
+"""
+
+
+def adb_reconnect(scan: bool = True, fixed_port: bool = True) -> str | None:
+    """Connect adb to this phone if it can be: an existing connection, the last
+    serial that worked, the fixed port, then Wireless debugging's port (mDNS,
+    then, if `scan`, a scan of local ports). With `fixed_port`, then moves adbd
+    to 127.0.0.1:5555. Returns the serial, or None (Wireless debugging is off,
+    or this phone was never paired)."""
+    out = _proot_bash(_reconnect_script([], fixed_port), timeout=120)
+    if out is None and scan:
+        out = _proot_bash(_reconnect_script(open_local_ports(), fixed_port), timeout=300)
+    return (out or "").strip() or None
+
+
+def cmd_open_dev_settings() -> str:
+    """Open Developer options, where Wireless debugging is (opens it, never changes it)."""
+    return f"{BIN}/am start --user 0 -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS"
+
+
 # Tasker profile "Intent Received: phoneautomations.MARK_READ" runs AutoNotification
 # Actions with Button Text Filter %button, Package Name Filter %app, Title Filter %chat.
 MARK_READ_BUTTON = {"com.whatsapp": "Mark as read", "org.telegram.messenger": "Mark as Read",

@@ -4,6 +4,8 @@
 # so it keeps running when the shell or Claude session that started it ends.
 #
 #   bin/automations start | stop | restart | status | logs | doctor | validate | replay | fire RULE | groups | assign | resolve
+#   bin/automations adb                 # after a reboot: reconnect adb (once Wireless debugging is on)
+#   bin/automations adb-wait [MINUTES]  # the same in the background, with a card saying what to turn on
 #   bin/automations termux COMMAND...   # run COMMAND natively in Termux (from Ubuntu too) and wait for it
 set -euo pipefail
 
@@ -64,6 +66,11 @@ case "${1:-status}" in
   logs)     tail -n "${2:-40}" "$ROOT/var/automations.log" ;;
   doctor)   if in_proot; then termux_run "$ROOT/bin/automations" doctor; else py doctor; fi ;;
   termux)   shift; termux_run "$@" ;;
+  adb)      shift; if in_proot; then termux_run "$ROOT/bin/automations" adb "$@"; else py adb "$@"; fi ;;
+  adb-wait) # after a reboot (boot/start-automations): wait for Wireless debugging, then reconnect
+    if tm has-session -t adb-wait 2>/dev/null; then echo "already waiting"; exit 0; fi
+    tm new-session -d -s adb-wait "exec '$ROOT/bin/automations' adb --wait ${2:-240}"
+    echo "waiting for Wireless debugging in the background (tmux session adb-wait)" ;;
   validate|replay|fire|groups|assign|resolve|seen|remind|sms|idea|calcopy) shift_cmd=$1; shift; py "$shift_cmd" "$@" ;;
-  *) echo "usage: $0 start|stop|restart|status|logs|doctor|termux COMMAND...|validate|replay|fire RULE|groups|assign GROUP PROFILE|resolve N|seen|remind NID WHEN|sms NUMBER TEXT|idea yes|no NID|calcopy yes|no ID"; exit 2 ;;
+  *) echo "usage: $0 start|stop|restart|status|logs|doctor|adb|adb-wait [MINUTES]|termux COMMAND...|validate|replay|fire RULE|groups|assign GROUP PROFILE|resolve N|seen|remind NID WHEN|sms NUMBER TEXT|idea yes|no NID|calcopy yes|no ID"; exit 2 ;;
 esac

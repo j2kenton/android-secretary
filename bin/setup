@@ -2,7 +2,8 @@
 # Set up android-secretary on this phone. SETUP.md walks through the whole setup,
 # and Claude Code can follow it for you; this script is its mechanical part.
 #
-#   bin/setup
+#   bin/setup                     # the usual
+#   bin/setup --claude-at-boot    # also start Claude Code (Remote Control on) after every reboot
 #
 # Safe to run again. It:
 #   - installs the Termux packages it needs,
@@ -10,6 +11,7 @@
 #     (it never overwrites yours),
 #   - installs the after-reboot script (Termux:Boot) and the Share -> Termux handler,
 #     unless you already have your own,
+#   - with --claude-at-boot, installs boot/start-claude too (see bin/claude-session),
 #   - ends with `bin/automations doctor`, which says what's still missing.
 # It doesn't start the daemon, grant a permission or change a phone setting.
 set -euo pipefail
@@ -19,6 +21,13 @@ PREFIX=/data/data/com.termux/files/usr
 TERMUX_HOME=/data/data/com.termux/files/home
 # For trying the script out without touching the phone's own setup:
 INSTALL_HOME="${SETUP_INSTALL_HOME:-$TERMUX_HOME}"   # where the boot and Share scripts go
+CLAUDE_AT_BOOT=""
+for arg in "$@"; do
+  case "$arg" in
+    --claude-at-boot) CLAUDE_AT_BOOT=1 ;;
+    *) echo "usage: bin/setup [--claude-at-boot]" >&2; exit 2 ;;
+  esac
+done
 
 # From Ubuntu (where Claude Code runs), run this in Termux itself.
 case "$(uname -r)" in *PRoot*) exec "$ROOT/bin/automations" termux "$ROOT/bin/setup" "$@" ;; esac
@@ -72,6 +81,10 @@ echo
 echo "== After a reboot, and Share -> Termux"
 install_file "$ROOT/boot/start-automations" "$INSTALL_HOME/.termux/boot/start-automations" \
   "brings the phone-automations daemon back up"
+if [ -n "$CLAUDE_AT_BOOT" ]; then
+  install_file "$ROOT/boot/start-claude" "$INSTALL_HOME/.termux/boot/start-claude" \
+    "starts Claude Code with Remote Control after the phone starts"
+fi
 install_file "$ROOT/share/termux-url-opener" "$INSTALL_HOME/bin/termux-url-opener" \
   "This only saves the link for Claude"
 
@@ -86,4 +99,7 @@ Next:
   2. Make private.toml and rules.toml yours (SETUP.md, step 4; Claude Code can ask
      you the questions and fill them in).
   3. bin/automations start
+
+Tip: to open Claude Code with one word, add this to Termux's ~/.bashrc:
+  alias cc='$ROOT/bin/claude-session'
 EOF

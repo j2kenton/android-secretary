@@ -107,8 +107,8 @@ def claude() -> tuple[bool, str]:
 def adb() -> tuple[bool, str]:
     if android.adb_output("echo ok", timeout=40) == "ok\n":
         return True, "adb reaches the phone"
-    return False, ("adb isn't connected (needed to clear other apps' notifications): "
-                   "Wireless debugging, then SETUP.md step 5")
+    return False, ("adb isn't connected (needed to clear other apps' notifications): turn on "
+                   "Wireless debugging, then bin/automations adb (first time: SETUP.md step 5)")
 
 
 def overlay() -> tuple[bool, str]:

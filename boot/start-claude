@@ -1,0 +1,5 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Termux:Boot script: starts Claude Code with Remote Control after the phone starts, so
+# you can reach it from the Claude app or claude.ai/code without opening Termux.
+# Optional: `bin/setup --claude-at-boot` installs it; delete ~/.termux/boot/start-claude to stop.
+exec /data/data/com.termux/files/home/phone-automations/bin/claude-session start
