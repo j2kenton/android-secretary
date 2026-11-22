@@ -370,6 +370,27 @@ def mark_read(package: str, title: str, key: str = "") -> bool:
     return True
 
 
+def mark_read_pinned(package: str, chat: str, key: str) -> bool:
+    """Telegram's "<chat> pinned "…"" notice has no title, so the title filter
+    above can't find it. Tasker's second profile, "Intent Received:
+    phoneautomations.MARK_READ_TEXT", presses its "Mark as read" with Text Filter
+    %text = '<chat> pinned' instead (README, Mark as read). Only sent when the
+    chat's name survives chat_filter whole, so the filter can't be a stub that
+    matches other chats. Returns whether a request was sent."""
+    button = MARK_READ_BUTTON.get(package)
+    if not button or not chat or len(chat) < 3 or chat_filter(chat) != chat:
+        return False
+    actions = notification_actions(key)
+    if actions is not None:
+        match = next((a for a in actions if a.strip().lower() == button.lower()), None)
+        if not match:
+            return False
+        button = match
+    _run(["am", "broadcast", "--user", "0", "-a", "phoneautomations.MARK_READ_TEXT",
+          "--es", "app", package, "--es", "text", f"{chat} pinned", "--es", "button", button])
+    return True
+
+
 # Never snoozed: Android keeps a snoozed key snoozed when the app updates it,
 # and snoozing a group summary snoozes every notification under it, so a chat's
 # later messages would vanish unseen and stay unread (2026-11-14, twice).

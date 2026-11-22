@@ -1274,6 +1274,9 @@ def group_collect(event, groups: dict | None = None, school: dict | None = None,
     owner is asked). Messages from watched groups are saved and snoozed out of
     the shade; 'active' groups and unclassified ones are left alone."""
     telegram = event.get("package") == TELEGRAM
+    if telegram and not event.get("title"):
+        _clear_pin(event, dismiss, school)
+        return
     if telegram:                                  # Telegram channels/groups: the title is the chat
         group, sender, text = sch.clean(event.get("title", "")), "", sch.clean(event.get("body", ""))
         if re.fullmatch(r"\d+ new messages?( from \d+ chats?)?|Telegram|joined Telegram!?", text or group):
@@ -1311,6 +1314,34 @@ def group_collect(event, groups: dict | None = None, school: dict | None = None,
             _questions_card()
     if dismiss and grp.watched(group):
         _clear(event)
+
+
+PINNED = re.compile(r"^(.+?) pinned ")
+
+
+def _clear_pin(event, dismiss: bool = True, school: dict | None = None) -> None:
+    """Telegram's "<chat> pinned "…"" notice (no title; the pinned text is cut
+    short and was posted before, so nothing is saved): marked read like the
+    chat's other notifications when the chat is watched. Never snoozed (it's the
+    chat's own notification); if it can't be marked read it stays, and the
+    chat's next message replaces it."""
+    import time
+    m = PINNED.match(event.get("body") or "")
+    key = event.get("key")
+    if not (m and key and dismiss):
+        return
+    group = sch.clean(m.group(1))
+    if not grp.watched(group) or grp.profile_of(group) in grp.NATIVE \
+            or sch.group_of(group, _school_groups(school)):
+        return                     # muted (left as it is) or school (school_collect's): not ours to clear
+    if not android.mark_read_pinned(TELEGRAM, group, key):
+        log.info("pinned notice in %s: left until its next message replaces it", group)
+        return
+    time.sleep(4)
+    if any(n.get("key") == key for n in android.notifications()):
+        log.info("pinned notice in %s: not marked read (Tasker's MARK_READ_TEXT profile set up?)", group)
+    else:
+        log.info("marked read (pinned notice): %s", group)
 
 
 def _muted_card(event, group: str, sender: str, text: str, telegram: bool, _state: dict | None) -> None:

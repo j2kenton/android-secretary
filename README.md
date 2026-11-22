@@ -298,6 +298,11 @@ sends `am broadcast -a phoneautomations.MARK_READ --es app <package> --es chat
 - Profile: Event → System → Intent Received, Action `phoneautomations.MARK_READ`
 - Task "Mark read": Plugin → AutoNotification → Actions, with Button Text Filter
   `%button` (case insensitive), Package Name Filter `%app`, Title Filter `%chat`.
+- For Telegram's "pinned" notices, which have no title: a second profile, Intent
+  Received `phoneautomations.MARK_READ_TEXT`, with a clone of that task whose
+  Title Filter is empty and whose Text Filter is `%text` (the code sends
+  `<chat> pinned`). Without it, a pinned notice stays until the chat's next
+  message replaces it.
 
 ## Secretary
 
