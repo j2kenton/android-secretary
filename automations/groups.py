@@ -281,6 +281,10 @@ up to 12 hours later. If it might be time-sensitive (something happening now or 
 plans), or it isn't just news (it touches the owner's family, home, neighbourhood or a group they're part of,
 or it asks for something), it is never daily: use summary or card as usual. When unsure, summary, not daily.
 skip = not worth anything (most messages). ask = you can't tell whether the owner would care.
+An ad is skip, never card, summary or daily, even when a news channel posts it as news: something mainly
+there to sell (a deal, a product, a sale, fares or prices, "from $599", a company's new route or branch, a
+sponsored post, a channel promoting itself or its links). Only Offers (above) that fit the family are kept,
+through "offer" as usual.
 update = the message changes something already surfaced (e.g. "we have enough people now", an event moved or
 cancelled): "line" is the new state, said plainly (e.g. "8:30 football: they have enough players now").
 For a call for help or people, say in "line" when it was posted (e.g. "asked 08:30") so the owner can judge.

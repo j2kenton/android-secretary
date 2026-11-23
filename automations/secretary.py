@@ -81,6 +81,8 @@ For EACH notification, output one JSON object per line (no other text, no code f
 kind: ignore = no value, dismiss = glance and clear, act_now = needs the owner soon,
 reply = someone expects an answer, schedule = has a date/time worth putting in the calendar,
 later = useful but not now, automate = recurring and a rule should handle it.
+An ad (marketing, a sale or deal, a promotion, a sponsored post) is ignore
+unless it plainly concerns the owner (something they asked or are waiting for, a change to a service they pay for).
 Be concrete: name the sender, the deadline, the reply to send, the event to create.
 {judge}"""
 
@@ -91,6 +93,7 @@ For each of those, add a "keep" field to its JSON object, one of:
 - "clear": OBVIOUSLY of no interest to the owner (it is removed, nothing kept);
 - "summary": in doubt (it becomes one line on a summary card the owner skims, and is removed);
 - "card": seems of interest (it stays on the phone as is).
+An ad (see above) is "clear" unless it plainly concerns the owner.
 If torn between two, choose the one that keeps more. The owner corrects mistakes either way."""
 
 
