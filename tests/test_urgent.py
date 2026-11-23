@@ -55,6 +55,15 @@ class UrgentTests(unittest.TestCase):
         self.notify.assert_called_once()
         self.assertEqual(self.notify.call_args.args[1], "Ben hurt, come now")    # a summary, not the message again
 
+    def test_a_voice_message_or_photo_alone_is_not_judged(self):
+        for body in ("🎤 Voice message (0:46)", "📷 Photo", "📷 Sent a photo", "🎥 Video (1:02)"):
+            self.assertTrue(self.check(ev("Dana", body), "MAYBE: unclear voice message"))
+        self.ask.assert_not_called()
+        self.notify.assert_not_called()
+        self.check(ev("Dana", "📷 Ben fell, look at his arm, come now"), "URGENT: Ben hurt, come now")
+        self.assertIn("Ben fell, look at his arm", self.ask.call_args.args[0])
+        self.assertNotIn("📷", self.ask.call_args.args[0])
+
     def test_not_urgent_said_outright(self):
         self.check(ev("Dana", "Not urgent, but call the plumber"))
         self.notify.assert_not_called()

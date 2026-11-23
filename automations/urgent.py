@@ -2,7 +2,8 @@
 kids): when one is clearly urgent, their chat opens straight away.
 
 Each new message from a person in private.toml [urgent] people (WhatsApp or
-SMS, their own chat, not a group) is checked: obvious words ("urgent", "emergency",
+SMS, their own chat, not a group) is checked (only what they wrote: a voice message
+or photo with no caption isn't): obvious words ("urgent", "emergency",
 "דחוף", "חירום"…) at once, otherwise Claude decides in the background (about
 half a minute) so nothing else waits. Clearly urgent: the screen wakes, their chat
 opens (WhatsApp; Messages for an SMS; if the phone is locked, the moment it's
@@ -49,6 +50,19 @@ NOT_URGENT = re.compile(r"\b(not|no|nothing|isn't|non)[\s-]+urgent|לא\s+דחו
 HINT = re.compile(r"\burgent|\bemergency|\bhospital|ambulance|\baccident|\bpolice|\bhurt|\binjur|\bbleed|"
                   r"\bhelp\b|\basap\b|right now|call me|\banswer\b|pick up|where are you|\bstuck\b|\blost\b|"
                   r"דחוף|חירום|בית חולים|אמבולנס|מד\"א|תאונה|משטרה|נפגע|פצוע|עזרה|הצילו|תתקשר|תענה|מיד|עכשיו|איפה אתה", re.I)
+
+
+# What WhatsApp shows for a voice message, photo, video… ("🎤 Voice message (0:46)", "📷 Photo",
+# "📷 Sent a photo"); a caption after it is still read. A placeholder alone says nothing about
+# urgency: asked about it, Claude reads an unheard voice message as "maybe urgent".
+MEDIA = re.compile(r"^\W*?(?:🎤|📷|🎥|📹|🎵|📄|📎|👤|📍|🖼|👾|GIF\b)\uFE0F?\s*"
+                   r"(?:(?:Sent an? )?(?:voice message|audio|photo|video|video note|document|file|contact|"
+                   r"location|live location|sticker|GIF)s?\b)?\s*(?:\(\d+:\d\d\))?\s*", re.I)
+
+
+def written(text: str) -> str:
+    """The words someone wrote: the text without a media placeholder ("" for a voice message alone)."""
+    return MEDIA.sub("", text, count=1).strip()
 
 
 def obvious(text: str) -> bool:
@@ -198,6 +212,9 @@ def check(event: dict, people: dict[str, dict], book=None, background: bool = Tr
     name = _contact(title, package, people)
     if not name or not text or quiet_now():
         return False
+    text = written(text)
+    if not text:                # a voice message or photo alone: nothing to judge
+        return True
     key = f"{package}|{name}|{text}"
     if key in _seen:
         return True
@@ -224,7 +241,7 @@ def check_others(event: dict, family, book, background: bool = True) -> bool:
     check() watches (they're handled there). book: () -> {contact name: number};
     only saved contacts count, not businesses or unknown numbers. Returns
     whether the message is being checked."""
-    package, text = event.get("package", ""), (event.get("body") or "").strip()
+    package, text = event.get("package", ""), written((event.get("body") or "").strip())
     name = _chat_title(event.get("title", ""), package)
     if not name or name in family or not text or quiet_now():
         return False
