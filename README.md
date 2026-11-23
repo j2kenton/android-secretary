@@ -24,7 +24,9 @@ What it does, in short:
   contacts only a silent card, only when it's certainly urgent.
 - **Appointments, parcels, declined charges** from SMS: a card with the right button.
 - **A secretary** that suggests how each notification could be handled, so
-  repeated suggestions become rules.
+  repeated suggestions become rules. Confirmations of things you booked
+  yourself get no card: if one hasn't reached your calendar half an hour later,
+  a single card lists those that are missing.
 
 <p>
   <img src="screenshots/screenshot-1.png" width="360" alt="The notification shade with android-secretary's cards: a morning summary, a school item, a suggested reply, an appointment and a parcel">

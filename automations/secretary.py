@@ -74,7 +74,9 @@ For EACH notification, output one JSON object per line (no other text, no code f
            same language as their message (an English message gets an English reply, however short; never switch to
            another language the owner speaks) and in its tone, ready to send; otherwise empty>",
  "event": <only for kind schedule, when a date and time are known:
-           {{"title": "...", "start": "YYYY-MM-DDTHH:MM", "minutes": <duration>, "location": "..."}}; otherwise null>}}
+           {{"title": "...", "start": "YYYY-MM-DDTHH:MM", "minutes": <duration>, "location": "..."}}; otherwise null>,
+ "booked": <true when it confirms something the owner booked, bought or accepted themselves (a booking or
+            reservation confirmation, the calendar invitation that comes with it): a receipt, not news; else false>}}
 
 kind: ignore = no value, dismiss = glance and clear, act_now = needs the owner soon,
 reply = someone expects an answer, schedule = has a date/time worth putting in the calendar,
@@ -178,6 +180,8 @@ def parse(answer: str, count: int) -> dict[int, dict]:
             out[i] = {k: str(d.get(k, "")).strip() for k in ("summary", "kind", "suggestion", "rule_idea", "reply")}
             out[i]["suggestion"] = for_owner(out[i]["suggestion"])
             out[i]["event"] = _event(d.get("event"))
+            if d.get("booked") is True:
+                out[i]["booked"] = True
             if d.get("keep") in KEEPS:
                 out[i]["keep"] = d["keep"]
     return out

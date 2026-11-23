@@ -733,6 +733,7 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
         log.warning("secretary triage failed (queue kept): %s", e)
         return FAILED
     state = _state if _state is not None else {}
+    _booked_check(state, calendars or {})
     listed = _email_lists(email_lists or {}, groups or {}, secretary_cfg or {}, state)
     if not records and not listed:
         return
@@ -745,6 +746,7 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
     _cap_to_summary(records, (secretary_cfg or {}).get("summary_max", []))
     _big_transactions(records)
     _check_calendars(records, calendars or {})
+    _hold_booked(records, state)
     capped = {sch.clean(x).lower() for x in (secretary_cfg or {}).get("summary_max", [])}
     for r in records:
         # A capped sender's chat (a neighbourhood channel): marked read with
@@ -765,7 +767,7 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
     folded = set()
     for r in records:
         nid = _chat_nid(r)
-        if r.get("judged") or not (r["kind"] in secretary.OWN_CARD or (nid in chats and r["kind"] != "ignore")):
+        if r.get("judged") or r.get("held") or not (r["kind"] in secretary.OWN_CARD or (nid in chats and r["kind"] != "ignore")):
             continue
         if nid:                                # one card per chat, its messages listed
             chat_card(r, book, chats, school)
@@ -916,6 +918,90 @@ def _check_calendars(records: list[dict], calendars: dict[str, int]) -> None:
         r["calendar"] = cal.note(found)
         if found and all(found.values()):
             r["kind"], r["suggestion"] = "later", r["calendar"]
+
+
+# A confirmation of something the owner booked themselves is a receipt, not
+# news (owner, 2026-11-23: three bookings, six emails, six cards). The calendar
+# invite that comes with it takes a while to sync (and to be copied to Family),
+# so it's held, with no card, and looked for again after BOOKED_WAIT. Found in
+# every calendar: nothing is shown. Still missing: one card for all of them.
+BOOKED_WAIT = 30 * 60
+BOOKED_RECHECK = 10 * 60
+BOOKED_KEEP = 24 * 3600
+BOOKED_CARD = "booked"
+
+
+def _same_event(a: dict, b: dict) -> bool:
+    """Two emails about one booking (the shop's confirmation, the calendar invitation)."""
+    try:
+        close = abs(datetime.fromisoformat(a["start"]) - datetime.fromisoformat(b["start"])) <= cal.WINDOW
+    except (KeyError, TypeError, ValueError):
+        return False
+    return close and cal.same(a.get("title", ""), b.get("title", ""))
+
+
+def _hold_booked(records: list[dict], state: dict) -> None:
+    """Booked, and not (yet) in every calendar: held, no card of its own."""
+    held = state.setdefault("booked", [])
+    for r in records:
+        if r["kind"] != "schedule" or not r.get("booked") or not r.get("event"):
+            continue
+        r["held"] = True
+        if not any(_same_event(r["event"], h["event"]) for h in held):
+            held.append({"event": r["event"], "app": r.get("app", ""), "title": r.get("title", ""),
+                         "text": (r.get("text") or "")[:300], "at": time.time()})
+
+
+def _booked_check(state: dict, calendars: dict[str, int]) -> None:
+    """Held bookings, once BOOKED_WAIT has passed: in every calendar → dropped;
+    still missing → one 📅 card listing them, with an add button each (up to 3).
+    The buttons leave the card up (each adds one booking); it's updated as they
+    turn up in the calendar, and a swipe means done with all of them."""
+    held = state.get("booked") or []
+    if not held:
+        return
+    now = time.time()
+    if state.get("booked_card") and BOOKED_CARD not in {
+            n.get("tag") for n in android.notifications() if n.get("packageName") == "com.termux.api"}:
+        held = [h for h in held if not h.get("shown")]            # the card was swiped
+        state["booked_card"] = ""
+    left = []
+    for h in held:
+        if now - h["at"] > BOOKED_KEEP:
+            continue
+        if now - h["at"] >= BOOKED_WAIT and now - h.get("checked", 0) >= BOOKED_RECHECK:
+            h["checked"] = now
+            try:
+                found = cal.where(datetime.fromisoformat(h["event"]["start"]), h["event"]["title"], calendars) \
+                    if calendars else None
+            except (KeyError, ValueError):
+                continue
+            if found and all(found.values()):
+                continue
+            h["calendar"] = cal.note(found)
+        left.append(h)
+    state["booked"] = left
+    due = sorted((h for h in left if "checked" in h), key=lambda h: h["event"]["start"])
+    lines, buttons = [], []
+    for h in due:
+        e, h["shown"] = h["event"], True
+        start = datetime.fromisoformat(e["start"])
+        lines.append(f"{dg.LTR}{start.strftime('%a %-d %b %H:%M')} {e['title']}"
+                     + (f" · {h['calendar']}" if h.get("calendar") else ""))
+        begin = int(start.timestamp() * 1000)
+        buttons.append(("📅 Add to calendar" if len(due) == 1 else f"📅 {start.strftime('%-d %b')}",
+                        android.cmd_calendar_insert(e["title"], begin, begin + e["minutes"] * 60_000,
+                                                    e.get("location", ""), h.get("text", ""))))
+    title = "" if not due else f"📅 Booked: {due[0]['event']['title']}" if len(due) == 1 \
+        else f"📅 {len(due)} bookings not in your calendar"
+    card = "\n".join([title, *lines])
+    if card == state.get("booked_card", ""):
+        return                                                   # the card already says this
+    if due:
+        android.notify(title, "\n".join(lines), notif_id=BOOKED_CARD, priority="default", buttons=buttons[:3])
+    else:
+        android.remove(BOOKED_CARD)
+    state["booked_card"] = card if due else ""
 
 
 def secretary_card(r: dict, book: dict, school: dict | None = None) -> None:
