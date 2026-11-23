@@ -52,6 +52,12 @@ kids = "Noa: grade 1. Ari: grade 10. Ben: kindergarten."
 # prayer_times = true     # groups that post a weekly schedule: keep it, and answer questions about it from it
 # never_fits = """Adults-only events are "" too"""   # offers that never fit the family, said to Claude as is
 
+# Chats where only some posts matter (a regional alerts channel): posts matching the
+# pattern are left unread with their own notification, and the chat isn't marked read
+# until you've read them; the rest go by the chat's profile (e.g. one that skips everything).
+# [groups.keep_unread]
+# "Regional Alerts" = 'springfield|whole country'
+
 [groups.profiles]
 news = "News groups, channels and bots. A card only for something that affects the owner today (a closure, a strike, a security alert); the rest at most a summary line."
 building = "The owner's apartment building group. Cards for water or power cuts and the lift; ignore chatter."

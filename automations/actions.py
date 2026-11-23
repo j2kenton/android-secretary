@@ -1376,6 +1376,9 @@ def group_collect(event, groups: dict | None = None, school: dict | None = None,
     if grp.profile_of(group) in grp.NATIVE:
         _muted_card(event, group, sender, text, telegram, _state)
         return
+    keep = ((groups or {}).get("keep_unread") or {}).get(group)
+    if keep and dismiss and grp.watched(group) and _left_unread(group, text, keep, event.get("key", "")):
+        return
     grp.collect(group, sender, text, "telegram" if telegram else "whatsapp")
     if not telegram:
         _learn_jid(event.get("title", ""))
@@ -1402,6 +1405,26 @@ def group_collect(event, groups: dict | None = None, school: dict | None = None,
         _clear(event)
 
 
+def _left_unread(group: str, text: str, pattern: str, key: str) -> bool:
+    """[groups] keep_unread: a chat where only some posts matter (the Home Front
+    Command channel: only posts about where the family lives, owner 2026-11-23). A post matching the
+    pattern is left as it is, unread, with its own notification. Marking the
+    chat read would mark that post read too, so until the owner has read it
+    (its notification is gone) the chat's other posts are left as well. True:
+    leave this notification alone."""
+    if re.search(pattern, text or "", re.I):
+        grp.hold(group, key)
+        log.info("left unread for you: %s", group)
+        return True
+    waiting = grp.held().get(group)
+    if waiting:
+        if any(n.get("key") == waiting for n in android.notifications()):
+            log.info("%s: not marked read, a post for you is still unread there", group)
+            return True
+        grp.unhold(group)
+    return False
+
+
 PINNED = re.compile(r"^(.+?) pinned ")
 
 
@@ -1418,8 +1441,8 @@ def _clear_pin(event, dismiss: bool = True, school: dict | None = None) -> None:
         return
     group = sch.clean(m.group(1))
     if not grp.watched(group) or grp.profile_of(group) in grp.NATIVE \
-            or sch.group_of(group, _school_groups(school)):
-        return                     # muted (left as it is) or school (school_collect's): not ours to clear
+            or sch.group_of(group, _school_groups(school)) or group in grp.held():
+        return                     # muted (left as it is), school (school_collect's) or a post left unread: not ours
     if not android.mark_read_pinned(TELEGRAM, group, key):
         log.info("pinned notice in %s: left until its next message replaces it", group)
         return
@@ -1456,19 +1479,20 @@ def _muted_card(event, group: str, sender: str, text: str, telegram: bool, _stat
 
 
 def sweep_handled(event, school: dict | None = None, min_age: float = 60,
-                  _state: dict | None = None, **_):
+                  groups: dict | None = None, _state: dict | None = None, **_):
     """Leftover notifications from groups that are handled (watched or school):
     ones that came in before the group was assigned, or while it was being asked
     about. Save the message (repeats are dropped) and clear it like any other.
     Fresh ones (under `min_age` seconds) are left to group/school collect."""
     state = _state if _state is not None else {}
     tried = state.setdefault("tried", [])
+    held = set(grp.held().values())
     now = datetime.now()
     for n in android.notifications():
         pkg, title, body = n.get("packageName"), n.get("title", ""), n.get("content", "")
         mark = f"{n.get('key')}|{body[:60]}"
-        if pkg not in ("com.whatsapp", TELEGRAM) or mark in tried:
-            continue
+        if pkg not in ("com.whatsapp", TELEGRAM) or mark in tried or n.get("key") in held:
+            continue                               # held: left unread for the owner (keep_unread)
         try:
             if (now - datetime.strptime(n.get("when", ""), "%Y-%m-%d %H:%M:%S")).total_seconds() < min_age:
                 continue
@@ -1483,6 +1507,9 @@ def sweep_handled(event, school: dict | None = None, min_age: float = 60,
         if sch.group_of(group, _school_groups(school)):
             sch.collect(title, body, _school_groups(school))
         elif grp.watched(group) and grp.profile_of(group) not in grp.NATIVE:
+            keep = ((groups or {}).get("keep_unread") or {}).get(group)
+            if keep and _left_unread(group, text, keep, n.get("key", "")):
+                continue
             grp.collect(group, sender, text, "telegram" if pkg == TELEGRAM else "whatsapp")
         else:
             continue

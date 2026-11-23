@@ -35,6 +35,7 @@ QUESTIONS = DIR / "questions.jsonl"
 ROUNDUP = DIR / "roundup.json"           # when "daily" news lines were last released
 SURFACED = DIR / "surfaced.jsonl"
 TIMES = DIR / "times.json"          # shul -> its latest posted prayer times, with the Shabbat they're for
+HELD = DIR / "held.json"            # chat -> the key of its notification left unread for the owner (keep_unread)
 OFFERS = DIR / "offers.json"        # programmes, sign-ups and events sent to everyone: when first seen
 MENTIONED = "📣 Mentioned you"      # WhatsApp's notification when someone @mentions the owner (its "sender")
 OFFER_DAYS = 60                     # an offer is remembered this long after it was last seen
@@ -166,6 +167,29 @@ def questions_prompt(qs: list[dict]) -> str:
         if q.get("about"):
             lines.append(f"   The message: \"{q['about'][:200]}\"")
     return "\n".join(lines + ["My answer: "])
+
+
+# ---- left unread ---------------------------------------------------------------
+
+def held() -> dict[str, str]:
+    """Chats with a post left unread for the owner ([groups] keep_unread): chat -> its notification's key."""
+    try:
+        return json.loads(HELD.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def hold(group: str, key: str) -> None:
+    h = held()
+    h[group] = key
+    DIR.mkdir(parents=True, exist_ok=True)
+    HELD.write_text(json.dumps(h, ensure_ascii=False), encoding="utf-8")
+
+
+def unhold(group: str) -> None:
+    h = held()
+    if h.pop(group, None) is not None:
+        HELD.write_text(json.dumps(h, ensure_ascii=False), encoding="utf-8")
 
 
 # ---- collecting --------------------------------------------------------------

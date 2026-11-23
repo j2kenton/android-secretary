@@ -304,6 +304,7 @@ secretary_cfg = "@secretary"   # summary_max senders: their texts count as "hear
 [[rule.actions]]
 type = "sweep_handled"
 school = "@school"
+groups = "@groups"             # keep_unread: posts left unread for you aren't swept
 
 # The secretary: every notification is queued, and every 15 minutes Claude
 # (no tools, it sees only the notification text) suggests how it could help
