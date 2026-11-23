@@ -1492,11 +1492,24 @@ def sweep_handled(event, school: dict | None = None, min_age: float = 60,
         _clear({"key": n["key"], "package": pkg, "title": title})
 
 
-def _group_reply_button(group: str, text: str) -> tuple[str, str]:
+def _distinct(texts: list[str]) -> list[str]:
+    """What tells replies apart: the leading words they all share left out
+    ("Shul A shacharit 9:00", "Shul A shacharit 8:00, then 9:00" -> "9:00",
+    "8:00, then 9:00"), so their cut-off button labels don't look the same (2026-11-23)."""
+    words = [t.split() for t in texts]
+    n = 0
+    while len(texts) > 1 and all(len(w) > n + 1 and w[n] == words[0][n] for w in words):
+        n += 1
+    return [" ".join(w[n:]) for w in words]
+
+
+def _group_reply_button(group: str, text: str, shown: str | None = None) -> tuple[str, str]:
     """💬 <reply>: copy the reply and open the group (a group chat can't be
-    prefilled), or WhatsApp's share sheet with it if the group's chat id isn't known."""
+    prefilled), or WhatsApp's share sheet with it if the group's chat id isn't known.
+    `shown`: the part of it the label shows (see _distinct)."""
     jid = android.jid_for(group)
-    label = f"📋 Copy “{text if len(text) <= 14 else text[:13] + '…'}”"
+    shown = shown or text
+    label = f"📋 Copy “{shown if len(shown) <= 14 else shown[:13] + '…'}”"
     if jid:
         return (label, f"{android.cmd_copy(text)}; {android.cmd_open_whatsapp_chat(jid)}; "
                        f"{android.BIN}/termux-toast 'Copied: paste and send'")
@@ -1563,7 +1576,9 @@ def group_digest(event, groups: dict | None = None, secretary_cfg: dict | None =
                            if p in (grp.profile_of(r["group"]) or "").split(",")), None)
             forward = _forward_button(target, f"{r['line']}\n\n{r['text']}") if target else None
             if r.get("replies") and not r.get("telegram"):     # someone asked; the likely answers, ready to paste
-                buttons += [_group_reply_button(r["group"], text) for text in r["replies"][:3 - len(buttons)]]
+                replies = r["replies"][:3 - len(buttons)]
+                buttons += [_group_reply_button(r["group"], text, shown)
+                            for text, shown in zip(replies, _distinct(replies))]
             elif forward:                          # forward or reply, not both: this profile forwards
                 buttons.append(forward)
                 if "news" in (grp.profile_of(r["group"]) or "").split(","):

@@ -178,6 +178,17 @@ class GroupTests(unittest.TestCase):
         self.assertIn("1@g.us", bus[0][1])
         self.assertEqual([b[0] for b in bikes], ["↪ Forward to Dana"])
 
+    def test_reply_buttons_show_what_tells_the_replies_apart(self):
+        """Two answers starting alike looked like the same button once cut off (2026-11-23)."""
+        replies = ["בית כנסת א שחרית 9:00", "בית כנסת א שחרית 8:00 (התחיל), ואחריו 9:00"]
+        with mock.patch.object(actions.android, "jid_for", return_value="1@g.us"):
+            labels = [actions._group_reply_button("G", t, s)[0] for t, s in zip(replies, actions._distinct(replies))]
+            copied = actions._group_reply_button("G", replies[0], "9:00")[1]
+        self.assertEqual(labels, ["📋 Copy “9:00”", "📋 Copy “8:00 (התחיל),…”"])
+        self.assertIn("שחרית 9:00", copied)                 # the whole reply is still what's copied
+        self.assertEqual(actions._distinct(["כן", "לא"]), ["כן", "לא"])
+        self.assertEqual(actions._distinct(["only one"]), ["only one"])
+
     def test_news_card_offers_forward_and_keeps_open(self):
         groups.assign("CBS", "news")
         out = [{"do": "card", "nid": "n1", "group": "CBS", "sender": "", "title": "Iran strike possible",
