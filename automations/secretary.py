@@ -35,6 +35,7 @@ QUEUE = DIR / "queue.jsonl"
 TRIAGED = DIR / "triaged.jsonl"
 JUDGED = DIR / "judged.jsonl"
 KEEPS = ("clear", "summary", "card")
+REPOST_HOURS = 6     # the same text again within this long is a re-post; later, it's news again (e.g. another tag)
 
 # A suggestion is shown to the owner on the card. Claude sometimes writes it as
 # a note to itself ("Summary line only; owner decides", "Remind the owner at
@@ -85,6 +86,10 @@ later = useful but not now, automate = recurring and a rule should handle it.
 An ad (marketing, a sale or deal, a promotion, a sponsored post) is ignore
 unless it plainly concerns the owner (something they asked or are waiting for, a change to a service they pay for).
 Be concrete: name the sender, the deadline, the reply to send, the event to create.
+"contact": true marks a sender saved in the owner's phone contacts: someone they know, so weigh it above the
+same from a stranger, a business or a page. A tag or mention on social media (Facebook, Instagram, LinkedIn:
+"mentioned you", "tagged you") usually goes to all of someone's followers: ignore it, unless the sender is a
+contact or family.
 """ + owner.VOICE + """
 {judge}"""
 
@@ -118,11 +123,16 @@ def collect(event: dict, noise: dict | None = None, _state: dict | None = None) 
     if dg.is_noise(n, noise):
         return False
     key = f"{n['packageName']}|{n['title']}|{n['content']}"
-    recent = (_state if _state is not None else {}).setdefault("recent", [])
-    if key in recent:                         # same text again (group summaries, re-posts)
+    state = _state if _state is not None else {}
+    now = datetime.now().timestamp()
+    recent = state.get("recent")
+    if not isinstance(recent, dict):          # was a list of keys, with no time
+        recent = state["recent"] = {}
+    if now - recent.get(key, 0) < REPOST_HOURS * 3600:   # same text again (group summaries, re-posts)
         return False
-    recent.append(key)
-    del recent[:-300]
+    recent[key] = now
+    for k in [k for k, t in recent.items() if now - t >= REPOST_HOURS * 3600]:
+        del recent[k]
     DIR.mkdir(parents=True, exist_ok=True)
     item = {"at": datetime.now().strftime("%Y-%m-%d %H:%M"), "app": dg.app_name(n["packageName"]),
             "package": n["packageName"], "title": n["title"], "text": n["content"][:400], "key": n["key"]}
@@ -192,6 +202,19 @@ def parse(answer: str, count: int) -> dict[int, dict]:
     return out
 
 
+def _contacts() -> set[str]:
+    from . import android
+    return android.contact_names()
+
+
+def in_contacts(title: str, names: set[str]) -> bool:
+    """Whether a notification's sender is saved in the phone's contacts: the title
+    ("Dana"), or the sender after a group's name ("Class parents: Dana")."""
+    t = re.sub("[\u200e\u200f\u202a-\u202e\u2066-\u2069]", "", title).strip().lower()
+    t = re.sub(r"\s*\(\d+ (?:new )?messages?\)$", "", t)
+    return bool(t) and (t in names or t.rpartition(": ")[2] in names)
+
+
 def triage(rule_names: list[str], model: str = "sonnet", decided: list[str] = (),
            judge: dict[str, str] | None = None) -> list[dict]:
     """Triage whatever is queued. Returns the triaged records (empty if nothing was queued).
@@ -203,8 +226,10 @@ def triage(rule_names: list[str], model: str = "sonnet", decided: list[str] = ()
     if not items:
         return []
     batch = items[:40]
+    known = _contacts()
     listing = "\n".join(json.dumps({"i": i, **{k: it[k] for k in ("app", "title", "text")},
                                     **({"context": it["context"]} if it.get("context") else {}),
+                                    **({"contact": True} if in_contacts(it.get("title", ""), known) else {}),
                                     **({"judge": True} if it.get("package") in judge else {})},
                                    ensure_ascii=False) for i, it in enumerate(batch))
     judged = {it.get("package") for it in batch} & set(judge)

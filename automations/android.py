@@ -56,6 +56,22 @@ def contacts() -> dict[str, str]:
     return {c.get("name", ""): c.get("number", "") for c in _json(["termux-contact-list"], timeout=60)}
 
 
+_CONTACT_NAMES: dict = {"at": 0.0, "names": set()}
+
+
+def contact_names(max_age: float = 3600) -> set[str]:
+    """The names saved in the phone's contacts, lower-case (read at most once an
+    hour; empty if they can't be read)."""
+    import time
+    if time.time() - _CONTACT_NAMES["at"] > max_age:
+        try:
+            names = {n.strip().lower() for n in contacts() if n.strip()}
+        except Exception:                      # never stop triage over this
+            names = _CONTACT_NAMES["names"]
+        _CONTACT_NAMES.update(at=time.time(), names=names)
+    return _CONTACT_NAMES["names"]
+
+
 def notifications() -> list[dict]:
     """Current notifications: id, key, packageName, title, content, when, ongoing."""
     return _json(["termux-notification-list"])
