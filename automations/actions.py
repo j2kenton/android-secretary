@@ -224,6 +224,7 @@ def _short(label: str) -> str:
     show: "⏰ Remind me tonight" -> "⏰ Tonight", "↪ Forward to Dana" -> "↪ To Dana"
     (cut off, "Forward…", "Remind…", "Remind…" tell nothing)."""
     for long, short in (("⏰ Remind me tonight", "⏰ Tonight"), ("⏰ Remind me tomorrow", "⏰ Tomorrow"),
+                        ("⏰ In an hour", "⏰ In 1h"),
                         ("↪ Forward to ", "↪ To ")):
         if label.startswith(long):
             return short + label[len(long):]
@@ -366,7 +367,7 @@ def _card_with_reminders(nid: str, title: str, text: str, buttons: list[tuple[st
     buttons (reminders.py)."""
     reminders.offer(nid, title, text, buttons, priority, day, which=tuple(which))
     now = datetime.now()
-    extra = reminders.buttons(nid, now, day, which, deadline=None if day else reminders.deadline_in(
+    extra = reminders.buttons(nid, now, day, which, deadline=None if day and day != now.date() else reminders.deadline_in(
                                      about if about is not None else _without_times(f"{title}\n{text}"), now))
     _own_card(nid, title, text, (list(buttons) + extra)[:3], priority=priority)
 

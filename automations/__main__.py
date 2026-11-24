@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     sn.add_argument("ids", help="comma-separated line ids")
     rm = sub.add_parser("remind", help="a card's ⏰ button: bring the card back tonight (evening) or tomorrow (morning)")
     rm.add_argument("nid")
-    rm.add_argument("when", help="evening, morning, or HH:MM today")
+    rm.add_argument("when", help="evening, morning, before (the evening before its day), hour, or HH:MM today")
     sm = sub.add_parser("sms", help="a card's send button: text, check it went, then remove the card")
     sm.add_argument("number")
     sm.add_argument("text")

@@ -45,10 +45,28 @@ class ReminderTests(unittest.TestCase):
 
     def test_buttons(self):
         tue_noon, tue_late = datetime(2026, 11, 17, 12, 0), datetime(2026, 11, 17, 20, 0)
-        labels = lambda now, day: [b[0] for b in reminders.buttons("n", now, day)]
+        labels = lambda now, day, **kw: [b[0] for b in reminders.buttons("n", now, day, **kw)]
         self.assertEqual(labels(tue_noon, date(2026, 11, 18)), ["⏰ Remind me tonight", "⏰ Remind me tomorrow"])
-        self.assertEqual(labels(tue_noon, date(2026, 11, 17)), ["⏰ Remind me tonight"])     # it's today
         self.assertEqual(labels(tue_late, date(2026, 11, 18)), ["⏰ Remind me tomorrow"])    # evening already here
+
+    def test_today_is_later_today_not_tonight(self):
+        tue = date(2026, 11, 17)
+        labels = lambda h, m=0, **kw: [b[0] for b in reminders.buttons("n", datetime(2026, 11, 17, h, m), tue, **kw)]
+        self.assertEqual(labels(6, 10), ["⏰ In an hour"])
+        self.assertEqual(labels(6, 10, deadline=datetime(2026, 11, 17, 13, 30)), ["⏰ At 13:15", "⏰ In an hour"])
+        self.assertEqual(labels(13, 0, deadline=datetime(2026, 11, 17, 13, 30)), ["⏰ At 13:15"])   # sooner than an hour
+        self.assertEqual(labels(17, 45), ["⏰ Remind me tonight"])          # nothing earlier fits: tonight still helps
+        self.assertEqual(labels(20, 0), [])
+
+    def test_further_off_is_tonight_and_the_evening_before(self):
+        tue_7 = datetime(2026, 11, 17, 7, 0)
+        mon = date(2026, 11, 23)
+        b = reminders.buttons("n", tue_7, mon)
+        self.assertEqual([x[0] for x in b], ["⏰ Remind me tonight", "⏰ Sun eve"])
+        reminders.offer("n", "🏫 Mon 23/11: breakfast list", "t", [], day=mon, now=tue_7)
+        self.assertEqual(reminders.snooze("n", "before", tue_7), datetime(2026, 11, 22, 19, 30))
+        reminders.offer("n", "🏫 x", "t", [], day=None, now=tue_7)
+        self.assertEqual(reminders.snooze("n", "hour", tue_7), datetime(2026, 11, 17, 8, 0))
 
     def test_snooze_and_come_back_once(self):
         now = datetime(2026, 11, 17, 12, 0)
