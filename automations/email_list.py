@@ -128,7 +128,7 @@ def decide(posts: list[dict], label: str, kids: str = "", texted=(), today=None)
             do = grp.judge_offer(p["offer"], f"{label} (email)", offers, seen_texts, today)
             if do == "card" and not p["card"]:
                 p["card"] = "kids"
-                p["line"] = grp._offer_line(p["line"] or p["offer"]["name"], p["offer"])[:160]
+                p["line"] = grp._offer_line(grp.clip(p["line"] or p["offer"]["name"], 120), p["offer"])
                 p["title"] = p["title"] or p["offer"]["name"][:45]
         if p["card"] and not p["line"]:
             p["line"] = p["short"]

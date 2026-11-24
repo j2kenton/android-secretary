@@ -279,6 +279,10 @@ def card_lines(records: list[dict], max_lines: int = 6) -> list[str]:
     return lines[:max_lines] + ([f"+{more} more"] if more > 0 else [])
 
 
+CHAT_APPS = ("com.whatsapp", "org.telegram.messenger", "com.samsung.android.messaging",
+             "com.google.android.apps.messaging", "com.linkedin.android")
+
+
 def line(r: dict, today: str | None = None) -> str:
     """One line for the 🗂 card: when, the app, what happened. The suggestion
     only where it says something to do (later, automate): a cleared item's
@@ -290,6 +294,10 @@ def line(r: dict, today: str | None = None) -> str:
     app = r.get("app") or ""
     if app and r.get("summary", "").lower().startswith(app.lower() + ":"):   # "Blind · Blind: …"
         r = {**r, "summary": r["summary"][len(app) + 1:].strip()}
+    who = re.sub("[\u200e\u200f\u2066-\u2069]", "", r.get("title") or "").strip()
+    if (r.get("package") in CHAT_APPS and who and who.lower() not in r.get("summary", "").lower()
+            and r.get("keep") != "summary"):
+        r = {**r, "summary": f"{who}: {r['summary']}"}     # where to look for it
     if r.get("keep") == "summary":                     # a judged post: what it is
         body = f"📰 {r['app']} · {r['summary']}"
     elif r["kind"] in ("later", "automate") and r.get("suggestion"):

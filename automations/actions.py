@@ -1627,7 +1627,8 @@ def group_digest(event, groups: dict | None = None, secretary_cfg: dict | None =
 def _groups_summary() -> None:
     today = datetime.now().strftime("%Y-%m-%d")
     summaries.post("groups", "📰 Worth knowing",
-                   [(s["nid"], f"{s['at'][11:] if s['at'][:10] == today else s['at'][5:]} {s['line']}")
+                   [(s["nid"], f"{s['at'][11:] if s['at'][:10] == today else s['at'][5:]} {s['line']}"
+                               f"{grp.source(s.get('group', ''))}")
                     for s in grp.summary(hours=36)], nid="groups-summary")
 
 

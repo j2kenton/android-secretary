@@ -371,6 +371,21 @@ def offer_do(o: dict, before: dict | None, today: date) -> str:
     return "card" if soon else "summary"
 
 
+def clip(text: str, n: int) -> str:
+    """`text` cut to at most n characters at a word, with "…" when cut."""
+    text = text.strip()
+    if len(text) <= n:
+        return text
+    cut = text[:n - 1].rsplit(" ", 1)[0] if " " in text[:n - 1] else text[:n - 1]
+    return cut.rstrip(" ,;:-–(") + "…"
+
+
+def source(group: str) -> str:
+    """Where a line came from, for the end of the line: the chat's name, isolated so a Hebrew name
+    doesn't reorder the English around it."""
+    return f" · \u2068{group}\u2069" if group else ""
+
+
 def _offer_line(line: str, o: dict) -> str:
     """The line, with who it's for and when it closes if the line doesn't say."""
     extra = []
@@ -524,7 +539,7 @@ def digest(profiles: dict, model: str = "sonnet", kids: str = "", texted: list[s
         url = str(d.get("url") or "").strip()
         rec = {"do": do, "group": m["group"], "sender": m["sender"], "at": m["at"], "text": m["text"],
                "telegram": m.get("app") == "telegram",
-               "line": str(d.get("line", "")).strip()[:140], "url": url if url and url in m["text"] else "",
+               "line": clip(str(d.get("line", "")), 140), "url": url if url and url in m["text"] else "",
                "title": (str(d.get("title") or "").strip() or str(d.get("line", "")).strip())[:45],
                "question": str(d.get("question", "")).strip()[:150],
                "replies": [x.strip()[:120] for x in d.get("replies")
@@ -558,7 +573,7 @@ def digest(profiles: dict, model: str = "sonnet", kids: str = "", texted: list[s
         if offer and do != "update":
             # Offers sent to everyone: the owner's rule decides, not the profile.
             do = rec["do"] = judge_offer(offer, m["group"], offers, seen_texts, now.date())
-            rec["line"] = _offer_line(rec["line"] or offer["name"], offer)[:160]
+            rec["line"] = _offer_line(clip(rec["line"] or offer["name"], 120), offer)
             rec["title"] = rec["title"] or offer["name"][:45]
             rec["offer"] = offer
         elif m.get("sender", "").startswith(MENTIONED) and do in ("skip", "summary", "daily"):
@@ -566,7 +581,7 @@ def digest(profiles: dict, model: str = "sonnet", kids: str = "", texted: list[s
             # (a family member's "@… ??" in a family group mustn't end up on the summary).
             do = rec["do"] = "card"
             who = m["text"].split(":", 1)[0].strip() if ":" in m["text"] else ""
-            rec["line"] = rec["line"] or m["text"][:120]
+            rec["line"] = rec["line"] or clip(m["text"], 120)
             rec["title"] = (f"{who} mentioned you" if who else "Mentioned you")[:45]
         elif do == "summary" and set((profile_of(m["group"]) or "").split(",")) == {"news"}:
             # News channels: news that can wait, waits for the round-up; what
