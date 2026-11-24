@@ -12,6 +12,14 @@ import tomllib
 from . import paths
 
 
+# Added to every prompt whose words reach the owner's phone (cards, summary lines, titles).
+VOICE = """Whatever you write for the owner (a title, line, summary or suggestion) is shown to them as is, on their phone.
+Write it to them: "you", "your son", "asks you to call", never "the owner", "the user", or "he"/"him" for them.
+Say what happened and what they need to know or do, plainly. Leave out your own handling and judging: no "glance and
+clear", "nothing to do", "no action needed", "no question asked", "unclear message", "summary line only". If there's
+nothing for them to do, just say what it is. Don't guess at a meaning the message doesn't give."""
+
+
 def setting(table: str, key: str, default=None):
     """private.toml [table] key, or default (no private.toml, under tests, or not set)."""
     try:

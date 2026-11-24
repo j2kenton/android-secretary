@@ -26,6 +26,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from .paths import VAR
+from . import owner
 from . import claude
 from . import groups as grp
 from .school import clean
@@ -52,6 +53,7 @@ card = "addressed": the post names the owner ({owner}) or their family, replies 
 card = "disruption": a water, power or gas cut, a road closure or roadworks, rubbish collection changes, or a
   security notice in the area, that changes the household's day.
 Otherwise card = "".
+""" + owner.VOICE + """
 {offer_rules}
 If there are no unread emails, output exactly NONE."""
 

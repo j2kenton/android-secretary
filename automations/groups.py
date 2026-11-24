@@ -294,7 +294,8 @@ owner reads a summary it's too late to help. summary is only for what can wait h
 Replies to an earlier message (congratulations, condolences, thanks, "+1") are skip, unless they change it (update).
 Be realistic about time (compare "at", the stated time and Now): a call posted minutes ago is still live
 even if its stated time was a few minutes ago (a call short of people waits; people come late). Skip it
-only once it's clearly too late to help or attend, e.g. well past the stated time or long after it was posted."""
+only once it's clearly too late to help or attend, e.g. well past the stated time or long after it was posted.
+""" + owner.VOICE
 
 
 # Prayer times (private.toml [groups] prayer_times = true): shuls post the week's times in their

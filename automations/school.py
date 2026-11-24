@@ -24,6 +24,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from .paths import VAR
+from . import owner
 from . import claude, reminders
 
 DIR = VAR / "school"
@@ -61,6 +62,7 @@ Output one JSON object per line, nothing else (no code fences):
  If unsure, choose the earlier one (now over evening, evening over morning): the parent can push a card
  later with one tap, but can't get back time lost to a late one.
 If nothing qualifies, output exactly NONE.
+""" + owner.VOICE + """
 
 Messages:
 {messages}"""

@@ -41,7 +41,8 @@ KEEPS = ("clear", "summary", "card")
 # 12:30", "offer to add it to the calendar"): such a note means nothing
 # to the owner, so it's dropped.
 SELF_NOTE = re.compile(r"(?i)\b(the )?(owner|user)('s)?\b|\bclaude\b|summary line|\bno card\b|same card|"
-                       r"\boffer to\b|\bremind (them|him|her)\b|\b(kept|left) (as is|in the shade)\b|^(note|fyi)\s*:")
+                       r"\boffer to\b|\bremind (them|him|her)\b|\b(kept|left) (as is|in the shade)\b|^(note|fyi)\s*:|"
+                       r"^(glance|nothing (to do|needed)|no (action|reply|answer) needed|just a\b|already on (the |your )?calendar)")
 
 
 def for_owner(suggestion: str) -> str:
@@ -84,6 +85,7 @@ later = useful but not now, automate = recurring and a rule should handle it.
 An ad (marketing, a sale or deal, a promotion, a sponsored post) is ignore
 unless it plainly concerns the owner (something they asked or are waiting for, a change to a service they pay for).
 Be concrete: name the sender, the deadline, the reply to send, the event to create.
+""" + owner.VOICE + """
 {judge}"""
 
 JUDGE = """
