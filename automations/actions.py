@@ -648,11 +648,15 @@ def _greeting_only(event, senders) -> bool:
 
 def secretary_collect(event, noise: dict | None = None, school: dict | None = None,
                       email_lists: dict | None = None, secretary_cfg: dict | None = None,
-                      _state: dict | None = None, **_):
+                      clear: dict | None = None, _state: dict | None = None, **_):
     """Queue every (non-noise) notification for the secretary's next triage.
     Messages from school groups and other watched groups are left to their
     digests, and a mailing list's emails (switched on in private.toml
-    [email_lists]) to its daily line."""
+    [email_lists]) to its daily line. Known noise ([clear]) is cleared silently
+    by clear_noise: no triage, no line."""
+    if clear and dg.is_noise({"packageName": event.get("package", ""), "title": event.get("title", ""),
+                              "content": event.get("body", "")}, clear):
+        return
     if _greeting_only(event, (secretary_cfg or {}).get("greetings_only")):
         log.info("greeting from %s: marked read", sch.clean(event.get("title", "")))
         _clear(event)                            # marked read, or left in the shade; never snoozed
@@ -699,20 +703,16 @@ RULES_FILE = paths.RULES
 GLANCE_STAYS = ("com.google.android.calendar", "com.sec.android.app.clockpackage")   # their timing is the point
 ONE_TIME_CODE = re.compile(r"\b(code|OTP|passcode)\b|קוד|סיסמ", re.I)
 COUNT_HEADER = re.compile(r"^\s*\d+ new messages?\s*$")
-# Something the owner fetched, opened by tapping its notification (an offline page, a download): it stays.
-READY = re.compile(r"ready to (view|open|read)|download (complete|finished)|\bdownloaded\b|tap to (open|view)", re.I)
 
 
 def _glanced(r: dict, kind: str = "dismiss") -> bool:
     """A "dismiss" (glance and clear) item that moves to the 🗂 card, its own
     notification swiped away (e.g. a payment receipt). Not: chats (WhatsApp/Telegram), calendar reminders
-    and alarms, one-time codes (needed within minutes), Gmail's count header, and something
-    fetched for the owner that its notification opens (an offline page or a download is "ready")."""
+    and alarms, one-time codes (needed within minutes), Gmail's count header."""
     text = f"{r.get('title', '')} {r.get('text', '')}"
     return (r.get("kind") == kind and not r.get("judged")
             and r.get("package") not in (*android.NEVER_SNOOZE, *GLANCE_STAYS)
-            and not ONE_TIME_CODE.search(text) and not COUNT_HEADER.match(r.get("text") or "")
-            and not READY.search(text))
+            and not ONE_TIME_CODE.search(text) and not COUNT_HEADER.match(r.get("text") or ""))
 
 
 # Returned by an action whose Claude call failed (its input is kept for the

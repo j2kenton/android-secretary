@@ -35,6 +35,8 @@ APP_NAMES = {
     "com.google.android.youtube": "YouTube",
     "com.microsoft.emmx": "Edge",
     "com.android.chrome": "Chrome",
+    "com.microsoft.emmx": "Edge",
+    "com.android.chrome": "Chrome",
 }
 
 

@@ -345,6 +345,7 @@ source = "notification"
 [[rule.actions]]
 type = "secretary_collect"
 noise = "@noise"
+clear = "@clear"                     # known noise is cleared silently (clear-noise): no line on the 🗂 card
 school = "@school"                   # school and other watched groups have their own digests
 email_lists = "@email_lists"         # mailing lists read as one daily line (private.toml; each switched on with on = true)
 secretary_cfg = "@secretary"         # greetings_only: senders whose plain "שבת שלום" texts are just marked read
@@ -416,6 +417,7 @@ packages = ["com.instagram.barcelona",                           # Threads: neve
 "org.telegram.messenger" = ['\njoined Telegram!?$']        # "<someone> joined Telegram!"
 "com.sec.android.app.samsungapps" = ['(?i)\bupdates? available\b']   # Galaxy Store "1 update available"
 "com.google.android.googlequicksearchbox" = ['(?i)\btry (it )?now[.!]?$']   # Google app promos ("… Try now.")
+"com.microsoft.emmx" = ['\nPage is ready to view$']                # Edge: an offline page fetched later
 "com.sec.android.daemonapp" = ['\d ?°']                             # any Samsung weather forecast ("Tomorrow | …: Highs 22 to 24°C"): in the summaries instead
 "com.samsung.android.incallui" = ['^Call recorded\n']                 # "Recording saved in internal storage"; calls themselves untouched
 "com.bose.bosemusic" = ['^Keeping things in sync\.']                # Bose app's always-on headphone link notice; its other notifications stay
