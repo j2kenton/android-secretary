@@ -770,6 +770,7 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
     live = {n.get("tag") for n in android.notifications() if n.get("packageName") == "com.termux.api"}
     chats = {k: v for k, v in state.get("chats", {}).items() if k in live}   # a card swiped or tapped: start afresh
     folded = set()
+    matters: dict[str, list[dict]] = {}
     for r in records:
         nid = _chat_nid(r)
         if r.get("judged") or r.get("held") or not (r["kind"] in secretary.OWN_CARD or (nid in chats and r["kind"] != "ignore")):
@@ -777,11 +778,16 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
         if nid:                                # one card per chat, its messages listed
             chat_card(r, book, chats, school)
             folded.add(id(r))
+        elif r.get("matter") and r["kind"] in ("act_now", "reply") and r.get("package") != GMAIL:
+            matters.setdefault(r["matter"], []).append(r)
         elif r.get("package") == GMAIL and not _email_extra(r, school):
             continue                           # an email stays an email: Gmail's own notification is its card
         else:
             secretary_card(r, book, school)
     state["chats"] = chats
+    state["matters"] = {m: v for m, v in state.get("matters", {}).items() if _matter_nid(m) in live}
+    for matter, rs in matters.items():
+        matter_card(matter, rs, state["matters"], book, school)
 
     # Everything else: one informational card, newest first, kept for `hold_hours`.
     now = datetime.now().timestamp()
@@ -1040,6 +1046,34 @@ def secretary_card(r: dict, book: dict, school: dict | None = None) -> None:
         _own_card(secretary.item_id(r), title, text, buttons, priority=priority)
     else:
         _card_with_reminders(secretary.item_id(r), title, text, buttons, priority, which=TONIGHT)
+
+
+def _matter_nid(matter: str) -> str:
+    import hashlib
+    return "sec-m-" + hashlib.sha1(matter.lower().encode()).hexdigest()[:10]
+
+
+def matter_card(matter: str, rs: list[dict], matters: dict, book: dict, school: dict | None = None) -> None:
+    """One card per matter (an AWS support case, a bill), not per notification:
+    several about it at once, or one more while its card is up, are listed on the
+    same card. "🔗 Open" opens the thing itself when a notification links to it."""
+    prev = matters.get(matter, {})
+    lines = (prev.get("lines", []) + [f"{r['at'][11:16]} {r['summary']}" for r in rs])[-6:]
+    url = next((r["url"] for r in reversed(rs) if r.get("url")), prev.get("url", ""))
+    kind = "act_now" if any(r["kind"] == "act_now" for r in rs) or prev.get("kind") == "act_now" else rs[-1]["kind"]
+    matters[matter] = {"lines": lines, "url": url, "kind": kind}
+    last = rs[-1]
+    icon = {"act_now": "❗", "reply": "💬"}[kind]
+    title = f"{icon} {last['summary']}" if len(lines) == 1 else f"{icon} {matter} ({len(lines)})"
+    body = [] if len(lines) == 1 else [f"{dg.LTR}{l}" for l in lines]
+    if last.get("suggestion"):
+        body.append(last["suggestion"])
+    body.append(f"{dg.LTR}{last['app']} · {last['title']}")
+    buttons = [("🔗 Open", android.cmd_open_url(url))] if url else []
+    buttons.append(_approval_button([last.get("title"), last.get("text"), last.get("summary")], school)
+                   or _open_chat_button(last, book))
+    _card_with_reminders(_matter_nid(matter), title, "\n".join(body), buttons,
+                         "high" if kind == "act_now" else "default", which=TONIGHT)
 
 
 CHAT_APPS = ("com.whatsapp", "com.whatsapp.w4b", "org.telegram.messenger",

@@ -327,6 +327,14 @@ card offers it: "Open with reply" opens the chat (looked up in contacts) with
 the reply typed in, for the owner to edit and send. It never sends anything
 or acts on a notification itself.
 
+Something significant gets a card of its own, however many notifications come
+about it: Claude names the matter each is about (a support case, a bill), and
+notifications on the same matter share one card, listed on it as they come
+(while it's up), never lines on the summary. When a notification links to the
+thing itself, the card's "🔗 Open" opens it. Senders saved in the phone's
+contacts are marked, so the secretary weighs them above strangers; a social
+media tag counts only from a contact or family.
+
 ## Ensemble
 
 One card says Ensemble's state first: 🔴 needs you (a card waits, a run was

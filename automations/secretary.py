@@ -78,11 +78,18 @@ For EACH notification, output one JSON object per line (no other text, no code f
  "event": <only for kind schedule, when a date and time are known:
            {{"title": "...", "start": "YYYY-MM-DDTHH:MM", "minutes": <duration>, "location": "..."}}; otherwise null>,
  "booked": <true when it confirms something the owner booked, bought or accepted themselves (a booking or
-            reservation confirmation, the calendar invitation that comes with it): a receipt, not news; else false>}}
+            reservation confirmation, the calendar invitation that comes with it): a receipt, not news; else false>,
+ "matter": "<for act_now or reply: the matter it's about, a short English name, the same for every notification
+            about the same one (now or earlier: e.g. the case opened and a reply on it), e.g. 'AWS support case
+            123456789', 'Meta Business billing'; it names their shared card. Empty for a chat message>",
+ "url": "<a link copied exactly from the notification that opens the thing itself (the case, the bill, the
+         console page), else empty>"}}
 
 kind: ignore = no value, dismiss = glance and clear, act_now = needs the owner soon,
 reply = someone expects an answer, schedule = has a date/time worth putting in the calendar,
 later = useful but not now, automate = recurring and a rule should handle it.
+Something significant enough for a card of its own stays act_now even when several notifications about it come
+at once: they share a "matter" and become one card, never lines on the summary.
 An ad (marketing, a sale or deal, a promotion, a sponsored post) is ignore
 unless it plainly concerns the owner (something they asked or are waiting for, a change to a service they pay for).
 Be concrete: name the sender, the deadline, the reply to send, the event to create.
@@ -197,6 +204,10 @@ def parse(answer: str, count: int) -> dict[int, dict]:
             out[i]["event"] = _event(d.get("event"))
             if d.get("booked") is True:
                 out[i]["booked"] = True
+            for k, n in (("matter", 60), ("url", 500)):
+                v = str(d.get(k) or "").strip()
+                if v:
+                    out[i][k] = v[:n]
             if d.get("keep") in KEEPS:
                 out[i]["keep"] = d["keep"]
     return out
@@ -241,6 +252,9 @@ def triage(rule_names: list[str], model: str = "sonnet", decided: list[str] = ()
     ans = claude.ask(prompt, [], model=model, connect_wait=0)
     found = parse(ans.text, len(batch))
     records = [{**it, **found[i]} for i, it in enumerate(batch) if i in found]
+    for r in records:                            # a link must really be in the notification
+        if r.get("url") and r["url"] not in f"{r.get('text', '')} {r.get('context', '')}":
+            r.pop("url")
     for r in records:
         if r.get("reply") and not script.same_language(r.get("text", ""), r["reply"]):
             log.info("secretary: dropped a reply in another language than the message (%s)", r.get("app", ""))
