@@ -699,16 +699,20 @@ RULES_FILE = paths.RULES
 GLANCE_STAYS = ("com.google.android.calendar", "com.sec.android.app.clockpackage")   # their timing is the point
 ONE_TIME_CODE = re.compile(r"\b(code|OTP|passcode)\b|קוד|סיסמ", re.I)
 COUNT_HEADER = re.compile(r"^\s*\d+ new messages?\s*$")
+# Something the owner fetched, opened by tapping its notification (an offline page, a download): it stays.
+READY = re.compile(r"ready to (view|open|read)|download (complete|finished)|\bdownloaded\b|tap to (open|view)", re.I)
 
 
 def _glanced(r: dict, kind: str = "dismiss") -> bool:
     """A "dismiss" (glance and clear) item that moves to the 🗂 card, its own
     notification swiped away (e.g. a payment receipt). Not: chats (WhatsApp/Telegram), calendar reminders
-    and alarms, one-time codes (needed within minutes), Gmail's count header."""
+    and alarms, one-time codes (needed within minutes), Gmail's count header, and something
+    fetched for the owner that its notification opens (an offline page or a download is "ready")."""
     text = f"{r.get('title', '')} {r.get('text', '')}"
     return (r.get("kind") == kind and not r.get("judged")
             and r.get("package") not in (*android.NEVER_SNOOZE, *GLANCE_STAYS)
-            and not ONE_TIME_CODE.search(text) and not COUNT_HEADER.match(r.get("text") or ""))
+            and not ONE_TIME_CODE.search(text) and not COUNT_HEADER.match(r.get("text") or "")
+            and not READY.search(text))
 
 
 # Returned by an action whose Claude call failed (its input is kept for the

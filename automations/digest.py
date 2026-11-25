@@ -33,6 +33,8 @@ APP_NAMES = {
     "com.instagram.android": "Instagram",
     "com.linkedin.android": "LinkedIn",
     "com.google.android.youtube": "YouTube",
+    "com.microsoft.emmx": "Edge",
+    "com.android.chrome": "Chrome",
 }
 
 

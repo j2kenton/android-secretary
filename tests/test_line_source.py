@@ -33,5 +33,12 @@ class LineSourceTests(unittest.TestCase):
         self.assertEqual(secretary.line(r, "2026-11-24"), "09:00 👋 WhatsApp · Class parents: trip photos")
 
 
+    def test_a_page_or_download_ready_stays_on_the_phone(self):
+        r = {"kind": "dismiss", "package": "com.microsoft.emmx", "title": "10-day forecast", "text": "Page is ready to view"}
+        self.assertFalse(actions._glanced(r))
+        self.assertTrue(actions._glanced({**r, "text": "Your weekly summary"}))
+        self.assertEqual(secretary.dg.app_name("com.microsoft.emmx"), "Edge")
+
+
 if __name__ == "__main__":
     unittest.main()
