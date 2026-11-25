@@ -335,6 +335,11 @@ thing itself, the card's "🔗 Open" opens it. Senders saved in the phone's
 contacts are marked, so the secretary weighs them above strangers; a social
 media tag counts only from a contact or family.
 
+A chat (a person or a group) has one card, listed message by message. A
+message never shows both there and on the summary: once a chat has a card, or
+gets one, all its messages go on it, its earlier summary lines move onto it,
+and the question it asked stays on the card when a passing remark follows.
+
 ## Ensemble
 
 One card says Ensemble's state first: 🔴 needs you (a card waits, a run was

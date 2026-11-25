@@ -759,21 +759,32 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
         if r.get("key") and r.get("package") in CHAT_APPS and sch.clean(r.get("title", "")).lower() in capped:
             r["marked"] = True
             _clear({"key": r["key"], "package": r["package"], "title": r.get("title", "")})
+    live = {n.get("tag") for n in android.notifications() if n.get("packageName") == "com.termux.api"}
+    chats = {k: v for k, v in state.get("chats", {}).items() if k in live}   # a card swiped or tapped: start afresh
+    # A chat with a card (one already up, or one this batch makes) takes all
+    # its messages, whatever their kind: never a card and a 🗂 line both.
+    carded = (set(chats) | {_chat_nid(r) for r in records if r["kind"] in secretary.OWN_CARD
+                            and not r.get("judged") and not r.get("held")}) - {None}
     for r in records:     # "ignore" (spam, promos): swiped too, no line; "later": on 🗂, so swiped
         if r.get("marked"):
             continue
         if any(_glanced(r, k) for k in ("dismiss", "ignore", "later")) and r.get("key") \
                 and r.get("package") != GMAIL \
-                and _chat_nid(r) not in state.get("chats", {}):  # Gmail's are left as they are
+                and _chat_nid(r) not in carded:  # Gmail's are left as they are
             android.dismiss(r.get("package", ""), r.get("title", ""), r["key"])
     book: dict = {}
-    live = {n.get("tag") for n in android.notifications() if n.get("packageName") == "com.termux.api"}
-    chats = {k: v for k, v in state.get("chats", {}).items() if k in live}   # a card swiped or tapped: start afresh
     folded = set()
     matters: dict[str, list[dict]] = {}
+    seen = summaries.seen("secretary")
+    moved = [x for x in reversed(state.get("card", []))       # oldest first
+             if _chat_nid(x) in carded - set(chats) and secretary.item_id(x) not in seen]
+    if moved:                                   # its earlier 🗂 lines move onto the new card
+        state["card"] = [x for x in state["card"] if not any(x is m for m in moved)]
+        for x in moved:
+            chat_card(x, book, chats, school)
     for r in records:
         nid = _chat_nid(r)
-        if r.get("judged") or r.get("held") or not (r["kind"] in secretary.OWN_CARD or (nid in chats and r["kind"] != "ignore")):
+        if r.get("judged") or r.get("held") or not (r["kind"] in secretary.OWN_CARD or (nid in carded and r["kind"] != "ignore")):
             continue
         if nid:                                # one card per chat, its messages listed
             chat_card(r, book, chats, school)
@@ -784,6 +795,8 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
             continue                           # an email stays an email: Gmail's own notification is its card
         else:
             secretary_card(r, book, school)
+    for entry in chats.values():
+        entry.pop("ask", None)                 # this run's question only
     state["chats"] = chats
     state["matters"] = {m: v for m, v in state.get("matters", {}).items() if _matter_nid(m) in live}
     for matter, rs in matters.items():
@@ -796,7 +809,7 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
     kept = rest + [r for r in state.get("card", []) if r.get("ts", 0) >= now - hold_hours * 3600
                    and r.get("package") != GMAIL]          # lines from before email left 🗂 (2026-11-17)
     state["card"] = kept[:30]
-    if not rest and not listed:
+    if not rest and not listed and not moved:
         return
     shown = [r for r in reversed(kept)                                            # oldest first
              if r.get("keep") == "summary" or r["kind"] in ("later", "automate", "list") or _glanced(r)]
@@ -1130,10 +1143,13 @@ def chat_card(r: dict, book: dict, chats: dict, school: dict | None = None) -> N
     what = "updates" if entry.get("called") else "messages"
     head = f"{'❗' if entry['urgent'] else '💬'} {_chat_name(r)}" + (f" · {n} {what}" if n > 1 else "")
     body = "\n".join(dg.LTR + l for l in entry["lines"])
-    if r.get("suggestion") and r["kind"] in secretary.OWN_CARD:
-        body += f"\n{dg.LTR}→ {r['suggestion']}"
-    if r["kind"] == "reply" and r.get("reply") and r.get("package") == "com.whatsapp":
-        whatsapp_reply_card(r, _contacts(book), nid=nid, head=head, body=body)
+    if r["kind"] in secretary.OWN_CARD:
+        entry["ask"] = r
+    ask = entry.get("ask") or r                # a "later" message after a question keeps the question
+    if ask.get("suggestion") and ask["kind"] in secretary.OWN_CARD:
+        body += f"\n{dg.LTR}→ {ask['suggestion']}"
+    if ask["kind"] == "reply" and ask.get("reply") and ask.get("package") == "com.whatsapp":
+        whatsapp_reply_card(ask, _contacts(book), nid=nid, head=head, body=body)
         return
     buttons = [_open_chat_button(entry["via"], book)] if entry.get("via") else []
     if entry.get("called"):

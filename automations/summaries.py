@@ -81,6 +81,11 @@ def post(name: str, title: str, items: list[tuple[str, str]], nid: str | None = 
     return [(i, l) for i, l in st["pending"]]
 
 
+def seen(name: str) -> set[str]:
+    """The ids of the lines the owner already hid."""
+    return set(_load(name).get("seen", []))
+
+
 def render(name: str) -> None:
     st = _load(name)
     pending, nid = st.get("pending", []), st.get("nid", name)
