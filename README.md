@@ -338,17 +338,19 @@ media tag counts only from a contact or family.
 A chat (a person or a group) has one card, listed message by message. A
 message never shows both there and on the summary: once a chat has a card, or
 gets one, all its messages go on it, its earlier summary lines move onto it,
-and the question it asked stays on the card when a passing remark follows.
+and the question it asked stays on the card when a passing remark follows. "3 new
+messages" or a bare photo shows only until the chat's first words. Tapping a
+card opens what it's about: the chat, the group, the link.
 
 ## Ensemble
 
-One card says Ensemble's state first: 🔴 needs you (a card waits, a run was
+One card says Ensemble's state first: 🔵 needs you (a card waits, a run was
 paused or stopped, or a run's process died), 🟢 running (nothing for you), or
 ⚪ stopped (nothing running, nothing waiting). `ensemble.state()` checks live
 on the box over ssh, read-only: the run claims (and whether their processes
 are alive) plus the ensemble-ops `waiting-check.py`. It runs when Ensemble
 pushes a notification (whose ntfy notification is then cleared: the card
-replaces it) and every 5 minutes. It alerts only on a change to "needs you".
+replaces it) and every 5 minutes. It nudges (a quiet sound, no pop-up, and blue: it's never urgent) only on a change to "needs you".
 The morning card shows the same title.
 
 ## On-demand lookups (from a Claude session)

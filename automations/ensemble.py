@@ -75,10 +75,10 @@ def state(timeout: float = 60) -> dict:
     dead = [d for d in data.get("dead", []) if not DEFERRED.search(d.get("name", ""))]
     if dead:
         d = dead[0]
-        return {"kind": "needs", "title": "🔴 Ensemble needs you",
+        return {"kind": "needs", "title": "🔵 Ensemble needs you",
                 "detail": f"{d['name']} · {d['stage']}: the run died (its claim is held, the process is gone)."}
     if blocking:
-        return {"kind": "needs", "title": "🔴 Ensemble needs you",
+        return {"kind": "needs", "title": "🔵 Ensemble needs you",
                 "detail": "; ".join(_line(i) for i in blocking) + "\n"
                           + (("Also running: " + run_line) if run else "Nothing else is running.")}
     if run:

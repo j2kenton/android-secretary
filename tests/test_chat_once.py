@@ -62,6 +62,36 @@ class ChatOnceTests(unittest.TestCase):
         post.assert_not_called()                                            # 🗂 left as it is
         self.assertEqual([r["title"] for r in state["card"]], ["Alex"])
 
+    def test_new_messages_counts_show_only_until_words_come(self):
+        state = {}
+        card, _p, _d = self.triage([rec("53 new messages", "reply", at="2026-11-25 19:05")], state)
+        self.assertIn("53 new messages", card.call_args.args[2])                 # all there is, for now
+        nid = card.call_args.args[0]
+        card, _p, _d = self.triage([rec("did u see the originals?", "reply", at="2026-11-25 19:12"),
+                                    rec("3 new messages", "reply", at="2026-11-25 19:12")], state, live=[nid])
+        text = card.call_args.args[2]
+        self.assertIn("originals", text)
+        self.assertNotIn("new messages", text)
+
+
+class TapTests(unittest.TestCase):
+    def post(self, buttons, **kw):
+        with mock.patch.object(actions.android, "notify") as notify:
+            actions._own_card("n1", "📣 Something is blocking", "text", buttons, **kw)
+        return notify.call_args.kwargs
+
+    def test_a_group_card_without_an_open_button_still_opens_the_group(self):
+        out = self.post([("↪ Forward to Dana", "fwd")], opens=(actions.OPEN_CHAT, "open-group"))
+        self.assertTrue(out["on_tap"].startswith("open-group; "))
+        self.assertEqual([b[0] for b in out["buttons"]], ["↪ Forward to Dana"])
+
+    def test_the_open_chat_button_gives_way_to_the_tap(self):
+        out = self.post([("↪ To Dana", "fwd"), (actions.OPEN_CHAT, "open-group")], opens=(actions.OPEN_CHAT, "open-group"))
+        self.assertEqual([b[0] for b in out["buttons"]], ["↪ To Dana"])
+
+    def test_a_link_card_opens_the_link(self):
+        self.assertTrue(self.post([("🔗 Open", "url")])["on_tap"].startswith("url; "))
+
 
 if __name__ == "__main__":
     unittest.main()

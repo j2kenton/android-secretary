@@ -199,20 +199,21 @@ OPEN_CHAT = "💬 Open chat"           # only on a button that goes straight int
 
 
 def _own_card(nid: str, title: str, text: str, buttons: list[tuple[str, str]] = (),
-              priority: str = "high", on_tap: str | None = None) -> None:
+              priority: str = "high", on_tap: str | None = None, opens: tuple[str, str] | None = None) -> None:
     """One item, one card. Each button also removes the card. No "hide" button:
     a swipe does the same. A card from a chat opens it when
     tapped, like the app's own notification, and the card goes; a "💬 Open chat" button (one that goes straight into the chat)
     is then left out, since the tap does that. A button that only opens the app
-    stays, and the tap does the same."""
+    stays, and the tap does the same. `opens`: what the tap opens when no
+    button does (a group card whose buttons forward or reply)."""
     done = android.cmd_remove_notification(nid)
     if on_tap is None:
         opener = next((b for b in buttons if b[0] == OPEN_CHAT), None) \
-            or next((b for b in buttons if b[0].startswith(("Open ", "💬 Open in "))), None)
+            or next((b for b in buttons if b[0].startswith(("Open ", "💬 Open in ", "🔗 Open"))), None) or opens
         if opener:
             on_tap = f"{opener[1]}; {done}"
             if opener[0] == OPEN_CHAT:
-                buttons = [b for b in buttons if b is not opener]
+                buttons = [b for b in buttons if b[1] != opener[1]]
     if len(buttons) >= 3:                       # three share the width: about 9 characters each show
         buttons = [(_short(label), cmd) for label, cmd in buttons]
     buttons = [(label, f"{cmd}; {done}") for label, cmd in buttons]
@@ -1133,7 +1134,15 @@ def chat_card(r: dict, book: dict, chats: dict, school: dict | None = None) -> N
     entry = chats.setdefault(nid, {"lines": [], "urgent": False})
     call = r.get("package") in CALL_APPS
     icon = "📞 " if call else ""
-    entry["lines"] = (entry["lines"] + [f"{r.get('at', '')[11:16]} {icon}{r['summary']}".strip()])[-6:]
+    line = f"{r.get('at', '')[11:16]} {icon}{r['summary']}".strip()
+    if EMPTY_POST.match((r.get("text") or "").strip()):    # "3 new messages", "📷 Photo": a stand-in for want of words
+        if not entry["lines"] or entry.get("empty"):
+            entry["lines"] = (entry["lines"] + [line])[-6:]
+            entry["empty"] = True
+    else:
+        if entry.pop("empty", False):          # words at last: the stand-ins go
+            entry["lines"] = []
+        entry["lines"] = (entry["lines"] + [line])[-6:]
     entry["urgent"] = entry["urgent"] or r["kind"] == "act_now"
     if call:
         entry["called"] = True
@@ -1671,7 +1680,7 @@ def group_digest(event, groups: dict | None = None, secretary_cfg: dict | None =
             body = f"{r['line']}\n{dg.LTR}{who}"
             if r.get("times_from") and buttons:      # say where the ready answer comes from, so it can be checked
                 body += "".join(f"\n{dg.LTR}↪ {t}" for t in r["replies"]) + f"\n{dg.LTR}🕒 From {r['times_from']}"
-            _own_card(r["nid"], f"📣 {r['title']}", body, buttons)
+            _own_card(r["nid"], f"📣 {r['title']}", body, buttons, opens=_open_group_button(r))
     if any(r["do"] == "summary" for r in decided):
         _groups_summary()
     if any(r["do"] == "ask" for r in decided):
@@ -1720,7 +1729,7 @@ def ensemble_card(event, claude_session: str = "claude", unknown_after: int = 3,
         f"/ensemble-ops {situation}. What's waiting, and what should I click?", claude_session)
         + f"; {android.cmd_remove_notification('ensemble')}")]      # handled in chat now: the card goes
     android.notify(st["title"], dg.LTR + st["detail"], notif_id="ensemble",
-                   priority="high" if alert else "low", buttons=buttons)
+                   priority="default" if alert else "low", buttons=buttons)   # a nudge, not an alarm
 
 
 def clear_noise(event, clear: dict | None = None, **_):

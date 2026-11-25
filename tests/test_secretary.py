@@ -300,7 +300,7 @@ class EnsembleStateTests(unittest.TestCase):
         with self.probe(waiting=paused):
             st = ensemble.state()
         self.assertEqual(st["kind"], "needs")
-        self.assertEqual(st["title"], "🔴 Ensemble needs you")
+        self.assertEqual(st["title"], "🔵 Ensemble needs you")
         self.assertIn("4 cards waiting", st["detail"])
         with self.probe(dead=[run]):
             self.assertIn("run died", ensemble.state()["detail"])

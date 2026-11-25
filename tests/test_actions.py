@@ -73,7 +73,7 @@ class SpamDedupeTests(unittest.TestCase):
 
 class EnsembleCardTests(unittest.TestCase):
     def card(self, kind):
-        st = {"kind": kind, "title": "🔴 Ensemble needs you", "detail": "bugs9, impl-high-review: paused, 1 card waiting\nmore"}
+        st = {"kind": kind, "title": "🔵 Ensemble needs you", "detail": "bugs9, impl-high-review: paused, 1 card waiting\nmore"}
         with mock.patch.object(actions.ensemble, "state", return_value=st), \
              mock.patch.object(actions.android, "notify") as notify:
             actions.ensemble_card({}, _state={})
