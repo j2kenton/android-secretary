@@ -34,6 +34,7 @@ APP_NAMES = {
     "com.linkedin.android": "LinkedIn",
     "com.google.android.youtube": "YouTube",
     "com.microsoft.emmx": "Edge",
+    "com.zoho.mail": "Zoho Mail",
     "com.android.chrome": "Chrome",
     "com.microsoft.emmx": "Edge",
     "com.android.chrome": "Chrome",
