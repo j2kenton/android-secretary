@@ -1,0 +1,33 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Bring everything back up, after a crash or when something seems stuck:
+#   - the automations daemon (restarted in place, or started),
+#   - Claude Code with Remote Control (started if it isn't running; --claude restarts it too,
+#     which ends its current conversation: `claude --continue` picks it up again),
+#   - adb (reconnected, if Wireless debugging is on),
+# then `bin/automations doctor`.
+#
+#   bin/restart-all [--claude]
+#
+# Run it in Termux itself (the `up` alias, or a Termux:Widget home-screen button: SETUP.md).
+# From Ubuntu it runs itself in Termux, but only while Termux's tmux is running.
+set -u
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+case "$(uname -r)" in *PRoot*) exec "$ROOT/bin/automations" termux "$ROOT/bin/restart-all" "$@" ;; esac
+
+echo "== Automations"
+"$ROOT/bin/automations" restart
+
+echo
+echo "== Claude Code"
+if [ "${1:-}" = "--claude" ] && "$ROOT/bin/claude-session" status | grep -q '^running'; then
+  /data/data/com.termux/files/usr/bin/tmux kill-session -t "${CLAUDE_SESSION:-claude}" && echo "stopped"
+fi
+"$ROOT/bin/claude-session" start
+
+echo
+echo "== adb"
+"$ROOT/bin/automations" adb || true
+
+echo
+echo "== Checking"
+"$ROOT/bin/automations" doctor || true

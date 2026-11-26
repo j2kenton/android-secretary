@@ -219,7 +219,18 @@ The daemon runs natively in Termux (Python 3.11+, stdlib only), not in the
 proot distro, so it keeps going when a proot/Claude session ends. After a
 phone reboot it starts by itself if the Termux:Boot app is installed and was
 opened once (`bin/setup` installs its script); otherwise `bin/automations start`.
-All of these work from Ubuntu too.
+All of these work from Ubuntu too, except starting it while Termux's tmux isn't
+running (it would run inside Ubuntu, unable to call Claude), which is refused.
+
+**Something stopped?** `bin/restart-all` brings everything back: it restarts
+the daemon, starts Claude Code (with Remote Control) if it isn't running
+(`--claude` restarts it too), reconnects adb and runs `doctor`. Run it in Termux
+itself; `alias up=~/android-secretary/bin/restart-all` in Termux's `~/.bashrc`
+makes it one word. For a home-screen button, install
+[Termux:Widget](https://github.com/termux/termux-widget) (from the same place as
+Termux) and put a two-line script in `~/.shortcuts/`:
+`#!/data/data/com.termux/files/usr/bin/bash` and
+`exec ~/android-secretary/bin/restart-all`.
 
 ## Cards
 

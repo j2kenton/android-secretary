@@ -73,6 +73,9 @@ Common requests:
   /tmp/screen.png` (in Ubuntu), then look at it, and send it to them if they're
   on another device. Take one only when they ask: it shows whatever is on screen.
 - **"Is it working?"**: `bin/automations doctor` and `bin/automations status`.
+- **"Restart everything"**: `bin/restart-all` (or `up` in Termux). From Ubuntu it
+  needs Termux's tmux running; if it isn't, ask the owner to run `up` in a new
+  Termux session. Never start the daemon or a tmux server from Ubuntu otherwise.
 
 ## Code changes
 
