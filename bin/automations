@@ -91,6 +91,6 @@ case "${1:-status}" in
     if tm has-session -t adb-wait 2>/dev/null; then echo "already waiting"; exit 0; fi
     tm new-session -d -s adb-wait "exec '$ROOT/bin/automations' adb --wait ${2:-240}"
     echo "waiting for Wireless debugging in the background (tmux session adb-wait)" ;;
-  validate|replay|fire|groups|assign|resolve|seen|remind|sms|idea|calcopy) shift_cmd=$1; shift; py "$shift_cmd" "$@" ;;
-  *) echo "usage: $0 start|stop|restart|status|logs|doctor|adb|adb-wait [MINUTES]|termux COMMAND...|validate|replay|fire RULE|groups|assign GROUP PROFILE|resolve N|seen|remind NID WHEN|sms NUMBER TEXT|idea yes|no NID|calcopy yes|no ID"; exit 2 ;;
+  validate|replay|fire|groups|assign|resolve|seen|remind|sms|idea|calcopy|ensemble-snooze|claude-last) shift_cmd=$1; shift; py "$shift_cmd" "$@" ;;
+  *) echo "usage: $0 start|stop|restart|status|logs|doctor|adb|adb-wait [MINUTES]|termux COMMAND...|validate|replay|fire RULE|groups|assign GROUP PROFILE|resolve N|seen|remind NID WHEN|sms NUMBER TEXT|idea yes|no NID|calcopy yes|no ID|ensemble-snooze [MINUTES]|claude-last"; exit 2 ;;
 esac
