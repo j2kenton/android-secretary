@@ -11,7 +11,26 @@ import os
 import re
 import subprocess
 
+from .paths import VAR
+
 HOST = "ensemble-devbox"
+SNOOZE = VAR / "ensemble-snooze"        # the time the card's 💤 button keeps it quiet until
+
+
+def snooze(minutes: float) -> float:
+    """The card's 💤 button: no card for what it shows now, for `minutes`."""
+    import time
+    until = time.time() + minutes * 60
+    VAR.mkdir(parents=True, exist_ok=True)
+    SNOOZE.write_text(str(until))
+    return until
+
+
+def snoozed_until() -> float:
+    try:
+        return float(SNOOZE.read_text())
+    except (OSError, ValueError):
+        return 0.0
 CHECK = "python3 /workspace/claude-skills/ensemble-ops/scripts/waiting-check.py"
 SSH = os.environ.get("PREFIX", "/data/data/com.termux/files/usr") + "/bin/ssh"
 

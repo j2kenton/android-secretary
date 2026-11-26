@@ -69,6 +69,8 @@ def main(argv: list[str] | None = None) -> int:
     cc = sub.add_parser("calcopy", help="a 📅 Copy to Family? card's button: yes (copy it) or no (never)")
     cc.add_argument("answer", choices=("yes", "no"))
     cc.add_argument("event_id", help="one event id, or several separated by commas")
+    es = sub.add_parser("ensemble-snooze", help="the Ensemble card's 💤 button: quiet for that long, unless something changes")
+    es.add_argument("minutes", type=float, nargs="?", default=60)
     rs = sub.add_parser("resolve")
     rs.add_argument("n", type=int)
     f = sub.add_parser("fire")
@@ -115,6 +117,13 @@ def main(argv: list[str] | None = None) -> int:
         android.toast("Not sent. Opening Messages with it typed in")
         android.open_sms_draft(a.number, a.text)
         return 1
+    if a.cmd == "ensemble-snooze":             # from a tap: no config needed
+        from . import android, ensemble
+        from datetime import datetime
+        until = ensemble.snooze(a.minutes)
+        android.remove("ensemble")
+        android.toast(f"Ensemble: quiet until {datetime.fromtimestamp(until):%H:%M}, unless something changes")
+        return 0
     if a.cmd == "remind":                      # from a tap: no config needed
         from . import android, reminders
         due = reminders.snooze(a.nid, a.when)

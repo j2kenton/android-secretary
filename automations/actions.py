@@ -1727,13 +1727,15 @@ def news_roundup(event=None, **_):
     _groups_summary()
 
 
-def ensemble_card(event, claude_session: str = "claude", unknown_after: int = 3,
+def ensemble_card(event, claude_session: str = "claude", unknown_after: int = 3, snooze_minutes: int = 60,
                   _state: dict | None = None, **_):
     """A card only when Ensemble needs the owner (quiet if everything's good). Running, or stopped with nothing needed: no card (one
     already up is removed). Checked live on the box when Ensemble pushes
     something (its ntfy notification is then cleared) and every few minutes.
     If the box can't be checked `unknown_after` times in a row, a quiet card
-    says so, since a need could be hiding behind it."""
+    says so, since a need could be hiding behind it. Its 💤 button keeps the
+    same situation quiet for `snooze_minutes`; anything new shows at once, and
+    the card comes back as a nudge when the time is up if it still applies."""
     st = ensemble.state()
     state = _state if _state is not None else {}
     if st["kind"] != "unknown" and event.get("package") == "io.heckel.ntfy" and event.get("key"):
@@ -1745,16 +1747,30 @@ def ensemble_card(event, claude_session: str = "claude", unknown_after: int = 3,
             android.remove("ensemble")
         state.update(shown=False, kind=st["kind"], last=[st["title"], st["detail"]])
         return
-    if state.get("shown") and (st["title"], st["detail"]) == tuple(state.get("last", ())):
+    same = (st["title"], st["detail"]) == tuple(state.get("last", ()))
+    if same and time.time() < ensemble.snoozed_until():      # 💤: the card was removed by the button
+        state.update(shown=False, snoozed=True)
         return
-    alert = st["kind"] == "needs" and state.get("kind") != "needs"
+    if state.get("shown") and same:
+        return
+    woke = state.pop("snoozed", False) and same               # 💤 over and it still applies: a nudge again
+    alert = st["kind"] == "needs" and (state.get("kind") != "needs" or woke)
     state.update(shown=True, kind=st["kind"], last=[st["title"], st["detail"]])
     situation = re.sub(r"[^\w\s,.:;()'/-]", "", f"{st['title']}: {st['detail'].splitlines()[0]}").strip()
     buttons = [("🤖 Ask Claude", android.cmd_ask_claude(
         f"/ensemble-ops {situation}. What's waiting, and what should I click?", claude_session)
-        + f"; {android.cmd_remove_notification('ensemble')}")]      # handled in chat now: the card goes
+        + f"; {android.cmd_remove_notification('ensemble')}"),       # handled in chat now: the card goes
+               (f"💤 {_duration(snooze_minutes)}",
+                f"{shlex.quote(str(paths.ROOT / 'bin' / 'automations'))} ensemble-snooze {int(snooze_minutes)}")]
     android.notify(st["title"], dg.LTR + st["detail"], notif_id="ensemble",
                    priority="default" if alert else "low", buttons=buttons)   # a nudge, not an alarm
+
+
+def _duration(minutes: int) -> str:
+    """60 -> "1 hour", 90 -> "90 min", 120 -> "2 hours"."""
+    if minutes % 60:
+        return f"{minutes} min"
+    return f"{minutes // 60} hour" + ("s" if minutes > 60 else "")
 
 
 def clear_noise(event, clear: dict | None = None, **_):
