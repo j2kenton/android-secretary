@@ -362,9 +362,9 @@ on the box over ssh, read-only: the run claims (and whether their processes
 are alive) plus the ensemble-ops `waiting-check.py`. It runs when Ensemble
 pushes a notification (whose ntfy notification is then cleared: the card
 replaces it) and every 5 minutes. It nudges (a quiet sound, no pop-up, and blue: it's never urgent) only on a change to "needs you".
-Away from the computer? "💤 1 hour" puts the card away for an hour; it comes
-back, with a nudge, if Ensemble still needs you then, and anything new shows at
-once (`snooze_minutes` in the rule's action changes the hour).
+Away from the computer? "💤 1 hour" means "check again in an hour": no card
+until then, and then one (with a nudge) only if Ensemble still needs you
+(`snooze_minutes` in the rule's action changes the hour).
 The morning card shows the same title.
 
 ## On-demand lookups (from a Claude session)

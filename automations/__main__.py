@@ -39,6 +39,19 @@ def setup_logging(to_file: bool) -> None:
                         format="%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
 
+def under_proot() -> bool:
+    """Whether this process runs under proot (Ubuntu's proot-distro), not in Termux itself."""
+    try:
+        with open("/proc/self/status") as f:
+            tracer = next((int(l.split()[1]) for l in f if l.startswith("TracerPid:")), 0)
+        if not tracer:
+            return False
+        with open(f"/proc/{tracer}/status") as f:
+            return any(l.startswith("Name:") and "proot" in l for l in f)
+    except (OSError, ValueError):
+        return False
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="automations")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -69,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     cc = sub.add_parser("calcopy", help="a 📅 Copy to Family? card's button: yes (copy it) or no (never)")
     cc.add_argument("answer", choices=("yes", "no"))
     cc.add_argument("event_id", help="one event id, or several separated by commas")
-    es = sub.add_parser("ensemble-snooze", help="the Ensemble card's 💤 button: quiet for that long, unless something changes")
+    es = sub.add_parser("ensemble-snooze", help="the Ensemble card's 💤 button: no card until then; then a card only if still needed")
     es.add_argument("minutes", type=float, nargs="?", default=60)
     rs = sub.add_parser("resolve")
     rs.add_argument("n", type=int)
@@ -82,6 +95,13 @@ def main(argv: list[str] | None = None) -> int:
     a = p.parse_args(argv)
 
     setup_logging(to_file=a.cmd == "run")
+    if a.cmd == "run" and under_proot():
+        msg = ("The daemon was started inside Ubuntu (proot), where it can't call Claude and stops with "
+               "that session. Start it in Termux itself: bin/automations start")
+        logging.getLogger("automations").error(msg)
+        from . import android
+        android.notify("⚠️ Automations not started", msg, notif_id="automations-proot", priority="default")
+        return 1
     if a.cmd == "doctor":                      # works before anything is set up
         from . import doctor
         return 1 if doctor.run() else 0
@@ -122,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
         from datetime import datetime
         until = ensemble.snooze(a.minutes)
         android.remove("ensemble")
-        android.toast(f"Ensemble: quiet until {datetime.fromtimestamp(until):%H:%M}, unless something changes")
+        android.toast(f"Ensemble: I'll check again at {datetime.fromtimestamp(until):%H:%M}")
         return 0
     if a.cmd == "remind":                      # from a tap: no config needed
         from . import android, reminders

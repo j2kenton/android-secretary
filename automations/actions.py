@@ -1733,28 +1733,27 @@ def ensemble_card(event, claude_session: str = "claude", unknown_after: int = 3,
     already up is removed). Checked live on the box when Ensemble pushes
     something (its ntfy notification is then cleared) and every few minutes.
     If the box can't be checked `unknown_after` times in a row, a quiet card
-    says so, since a need could be hiding behind it. Its 💤 button keeps the
-    same situation quiet for `snooze_minutes`; anything new shows at once, and
-    the card comes back as a nudge when the time is up if it still applies."""
+    says so, since a need could be hiding behind it. Its 💤 button means "check
+    again in `snooze_minutes`": no card until then, whatever happens; then, only
+    if Ensemble still needs the owner, the card comes back as a nudge."""
     st = ensemble.state()
     state = _state if _state is not None else {}
     if st["kind"] != "unknown" and event.get("package") == "io.heckel.ntfy" and event.get("key"):
         android.snooze(event["key"])
     state["unknown"] = state.get("unknown", 0) + 1 if st["kind"] == "unknown" else 0
     show = st["kind"] == "needs" or (st["kind"] == "unknown" and state["unknown"] >= unknown_after)
+    if time.time() < ensemble.snoozed_until():                # 💤: look again when the time's up
+        state.update(shown=False, snoozed=True, kind=st["kind"], last=[st["title"], st["detail"]])
+        return
+    woke = state.pop("snoozed", False)
     if not show:
         if state.get("shown"):
             android.remove("ensemble")
         state.update(shown=False, kind=st["kind"], last=[st["title"], st["detail"]])
         return
-    same = (st["title"], st["detail"]) == tuple(state.get("last", ()))
-    if same and time.time() < ensemble.snoozed_until():      # 💤: the card was removed by the button
-        state.update(shown=False, snoozed=True)
+    if state.get("shown") and (st["title"], st["detail"]) == tuple(state.get("last", ())):
         return
-    if state.get("shown") and same:
-        return
-    woke = state.pop("snoozed", False) and same               # 💤 over and it still applies: a nudge again
-    alert = st["kind"] == "needs" and (state.get("kind") != "needs" or woke)
+    alert = st["kind"] == "needs" and (state.get("kind") != "needs" or woke)   # after 💤, still needed: a nudge
     state.update(shown=True, kind=st["kind"], last=[st["title"], st["detail"]])
     situation = re.sub(r"[^\w\s,.:;()'/-]", "", f"{st['title']}: {st['detail'].splitlines()[0]}").strip()
     buttons = [("🤖 Ask Claude", android.cmd_ask_claude(

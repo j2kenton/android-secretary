@@ -49,16 +49,36 @@ termux_run() {
 }
 py() { (cd "$ROOT" && PREFIX=$PREFIX PATH="$PREFIX/bin:$PATH" "$PY" -m automations "$@"); }
 
+# From Ubuntu, a tmux server must already be running in Termux: one started from here
+# would run inside Ubuntu's proot, where the daemon can't call Claude (proot-distro
+# refuses to nest), and it would die when this Ubuntu session ends (2026-11-26).
+termux_server() {
+  in_proot || return 0
+  tm list-sessions >/dev/null 2>&1 && return 0
+  echo "Termux's tmux isn't running, so the daemon can't be started from Ubuntu: it would" >&2
+  echo "run inside Ubuntu, unable to call Claude, and stop with this session. In Termux itself" >&2
+  echo "(swipe in from the left, New session), run: $ROOT/bin/automations start" >&2
+  return 1
+}
+CMD="cd '$ROOT' && $PREFIX/bin/termux-wake-lock; exec env PREFIX=$PREFIX PATH=$PREFIX/bin:\$PATH $PY -m automations run"
+
 case "${1:-status}" in
   start)
     if running; then echo "already running"; exit 0; fi
+    termux_server || exit 1
     py validate >/dev/null
-    tm new-session -d -s "$SESSION" \
-      "cd '$ROOT' && $PREFIX/bin/termux-wake-lock; exec env PREFIX=$PREFIX PATH=$PREFIX/bin:\$PATH $PY -m automations run"
+    tm new-session -d -s "$SESSION" "$CMD"
     sleep 2; running && echo "started" || { echo "failed to start; see var/automations.log"; exit 1; }
     ;;
   stop)     running && tm kill-session -t "$SESSION" && echo "stopped" || echo "not running" ;;
-  restart)  "$0" stop; "$0" start ;;
+  restart)
+    # In place, in the same tmux server: stopping first could leave no session, and
+    # the server would exit with it (then a start from Ubuntu has nowhere to run).
+    if ! running; then exec "$0" start; fi
+    py validate >/dev/null
+    tm respawn-pane -k -t "$SESSION" "$CMD"
+    sleep 2; running && echo "restarted" || { echo "failed to restart; see var/automations.log"; exit 1; }
+    ;;
   status)
     running && echo "running" || echo "not running"
     tail -n 5 "$ROOT/var/automations.log" 2>/dev/null || true

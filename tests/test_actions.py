@@ -103,13 +103,13 @@ class EnsembleCardTests(unittest.TestCase):
         self.assertEqual([run("unknown")[0] for _ in range(3)], [False, False, True])
 
 
-    def test_snooze_keeps_the_same_situation_quiet_for_an_hour(self):
+    def test_snooze_means_check_again_in_an_hour(self):
         _ask, (label, cmd) = self.card("needs")
         self.assertEqual(label, "💤 1 hour")
         self.assertTrue(cmd.endswith("ensemble-snooze 60"))
         state, clock = {}, [1000.0]
-        def run(title, until=0.0):
-            st = {"kind": "needs", "title": title, "detail": "d"}
+        def run(kind, title="A", until=0.0):
+            st = {"kind": kind, "title": title, "detail": f"waiting {clock[0]}"}   # the detail ticks
             with mock.patch.object(actions.ensemble, "state", return_value=st), \
                  mock.patch.object(actions.ensemble, "snoozed_until", return_value=until), \
                  mock.patch.object(actions.time, "time", return_value=clock[0]), \
@@ -117,14 +117,17 @@ class EnsembleCardTests(unittest.TestCase):
                  mock.patch.object(actions.android, "remove"):
                 actions.ensemble_card({}, _state=state)
             return notify.call_args.kwargs["priority"] if notify.called else None
-        self.assertEqual(run("A"), "default")
-        self.assertIsNone(run("A", until=4600))                  # 💤 tapped: quiet
-        self.assertIsNone(run("A", until=4600))
+        self.assertEqual(run("needs"), "default")
+        clock[0] = 1300.0
+        self.assertIsNone(run("needs", until=4600))               # 💤 tapped: nothing, though the text changed
+        self.assertIsNone(run("needs", "B", until=4600))          # nor for something new
         clock[0] = 5000.0
-        self.assertEqual(run("A", until=4600), "default")        # time's up and it still applies: a nudge again
+        self.assertEqual(run("needs", until=4600), "default")     # time's up, still needed: a nudge
         clock[0] = 6000.0
-        self.assertIsNone(run("A", until=9600))
-        self.assertEqual(run("B", until=9600), "low")            # something new shows at once
+        self.assertIsNone(run("needs", until=9600))
+        clock[0] = 10000.0
+        self.assertIsNone(run("running", until=9600))             # time's up, sorted meanwhile: no card
+        self.assertEqual(run("needs", until=9600), "default")     # needed again later: a card as usual
 
     def test_snooze_command_removes_the_card(self):
         from automations import __main__ as cli
@@ -132,7 +135,7 @@ class EnsembleCardTests(unittest.TestCase):
              mock.patch.object(actions.android, "toast") as toast:
             self.assertEqual(cli.main(["ensemble-snooze", "60"]), 0)
         remove.assert_called_once_with("ensemble")
-        self.assertIn("quiet until", toast.call_args.args[0])
+        self.assertIn("check again at", toast.call_args.args[0])
         self.assertGreater(actions.ensemble.snoozed_until(), actions.time.time() + 3500)
         actions.ensemble.SNOOZE.unlink()
 
