@@ -224,7 +224,10 @@ running (it would run inside Ubuntu, unable to call Claude), which is refused.
 
 **Something stopped?** `bin/restart-all` brings everything back: it restarts
 the daemon, starts Claude Code (with Remote Control) if it isn't running
-(`--claude` restarts it too), reconnects adb and runs `doctor`. Run it in Termux
+(`--claude` restarts it too), reconnects adb and runs `doctor`. Claude Code
+picks up the conversation you used last, in its own folder, unless it's still
+open in a running Claude Code (`CLAUDE_NEW=1` starts a new one instead); the
+same happens after a reboot. Run it in Termux
 itself; `alias up=~/android-secretary/bin/restart-all` in Termux's `~/.bashrc`
 makes it one word. For a home-screen button, install
 [Termux:Widget](https://github.com/termux/termux-widget) (from the same place as

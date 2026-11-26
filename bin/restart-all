@@ -1,8 +1,8 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # Bring everything back up, after a crash or when something seems stuck:
 #   - the automations daemon (restarted in place, or started),
-#   - Claude Code with Remote Control (started if it isn't running; --claude restarts it too,
-#     which ends its current conversation: `claude --continue` picks it up again),
+#   - Claude Code with Remote Control, resuming the conversation used last (started if it
+#     isn't running; --claude restarts it too, and it resumes the same conversation),
 #   - adb (reconnected, if Wireless debugging is on),
 # then `bin/automations doctor`.
 #

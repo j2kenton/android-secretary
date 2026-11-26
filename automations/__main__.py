@@ -82,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     cc = sub.add_parser("calcopy", help="a 📅 Copy to Family? card's button: yes (copy it) or no (never)")
     cc.add_argument("answer", choices=("yes", "no"))
     cc.add_argument("event_id", help="one event id, or several separated by commas")
+    sub.add_parser("claude-last", help="the Claude Code conversation bin/claude-session resumes: folder and id")
     es = sub.add_parser("ensemble-snooze", help="the Ensemble card's 💤 button: no card until then; then a card only if still needed")
     es.add_argument("minutes", type=float, nargs="?", default=60)
     rs = sub.add_parser("resolve")
@@ -137,6 +138,9 @@ def main(argv: list[str] | None = None) -> int:
         android.toast("Not sent. Opening Messages with it typed in")
         android.open_sms_draft(a.number, a.text)
         return 1
+    if a.cmd == "claude-last":                 # for bin/claude-session: no config needed
+        from . import claude_last
+        return claude_last.main()
     if a.cmd == "ensemble-snooze":             # from a tap: no config needed
         from . import android, ensemble
         from datetime import datetime

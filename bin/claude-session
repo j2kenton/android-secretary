@@ -6,8 +6,11 @@
 #   bin/claude-session start    start it in the background (boot/start-claude, after a reboot)
 #   bin/claude-session status
 #
-# It starts in this folder, so Claude reads CLAUDE.md; to start somewhere else, put
-# that folder's path (as Ubuntu sees it, e.g. /root/proj) in var/claude-dir.
+# It resumes the conversation used most recently (in its own folder), unless that
+# one is still open in a running Claude Code (`python -m automations claude-last`);
+# with none, it starts a new one in this folder, so Claude reads CLAUDE.md (to start
+# somewhere else, put that folder's path as Ubuntu sees it, e.g. /root/proj, in
+# var/claude-dir). CLAUDE_NEW=1 always starts a new one.
 # Set CLAUDE_ARGS to change the flags (default: --remote-control), CLAUDE_SESSION the tmux session.
 set -euo pipefail
 
@@ -24,11 +27,16 @@ running() { tm has-session -t "$SESSION" 2>/dev/null; }
 
 start() {
   if running; then echo "Claude Code is already running (tmux session $SESSION)"; return; fi
+  local dir=$DIR resume="" last=""
+  [ -n "${CLAUDE_NEW:-}" ] || last=$(cd "$ROOT" && "$PREFIX/bin/python3" -m automations claude-last 2>/dev/null || true)
+  if [ -n "$last" ]; then dir=${last%%$'\t'*}; resume="--resume ${last##*$'\t'}"; fi
   # Claude Code is installed in Ubuntu by its installer (~/.local/bin) or on the PATH.
+  # A resume that fails at once (the conversation is gone) falls back to a new conversation.
+  local claude='"$(command -v claude || echo $HOME/.local/bin/claude)"'
   tm new-session -d -s "$SESSION" "export PATH=$PREFIX/bin:\$PATH; termux-wake-lock; exec $PREFIX/bin/proot-distro login ubuntu -- \
-    bash -lc 'cd $(printf %q "$DIR") && exec \"\$(command -v claude || echo \$HOME/.local/bin/claude)\" $ARGS'"
+    bash -lc 'cd $(printf %q "$dir") && { ${resume:+$claude $resume $ARGS || [ \$SECONDS -gt 30 ] ||} exec $claude $ARGS; }'"
   sleep 2
-  running && echo "Claude Code started in tmux session $SESSION ($DIR)" \
+  running && echo "Claude Code started in tmux session $SESSION ($dir${resume:+, resuming ${resume#--resume }})" \
           || { echo "Claude Code didn't start: run bin/claude-session to see why" >&2; exit 1; }
 }
 
