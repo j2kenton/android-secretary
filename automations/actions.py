@@ -32,6 +32,7 @@ from . import weather as wx
 from . import quiet
 from . import shabbat
 from . import summaries
+from . import newsletters as newsl
 from . import reminders
 from . import extract as ext
 from . import urgent as urg
@@ -412,7 +413,8 @@ def notification_digest(event, title: str = "☀️ Morning", noise: dict | None
                         ignore_packages=(), ignore_titles=(), max_items: int = 8,
                         email: bool = False, email_since_hour: int = 17, email_max: int = 5,
                         ensemble_status: bool = False, school: dict | bool = False,
-                        weather: dict | None = None, weather_tomorrow: bool = False, **_):
+                        weather: dict | None = None, weather_tomorrow: bool = False,
+                        newsletters: dict | None = None, **_):
     """The morning overview, as a summary card you page through like the others
     (summaries.py, "✓ Hide these lines"): the weather, then each notification
     on the phone that has no card of its own, one readable line each, then a
@@ -468,6 +470,11 @@ def notification_digest(event, title: str = "☀️ Morning", noise: dict | None
                 extra.append((fwd[0].replace("↪ Forward to ", "↪ Weather to "), fwd[1], lines[0]))
         except (wx.WeatherError, KeyError) as e:
             log.warning("weather check failed: %s", e)
+    if newsletters:                                # 📚 the newsletters' best, read once a day (newsletters.py)
+        try:
+            lines += newsl.lines(newsletters)
+        except claude.ClaudeError as e:
+            log.warning("newsletters check failed: %s", e)
     status = []
     if ensemble_status:                            # only when it needs the owner
         st = ensemble.state()

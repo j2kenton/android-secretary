@@ -242,6 +242,14 @@ must name a Gmail thread id that the search really returned, or it's dropped,
 so nothing made up reaches the card. If the check fails, the card says
 "Email check didn't run".
 
+With `newsletters = "@newsletters"`, the card also gets up to three 📚 lines:
+the items most worth your time from the newsletters under one Gmail label
+(private.toml `[newsletters]`: `label`, `max_lines`, `interests`). Claude
+reads that label's emails from the last two days and any still unread from
+the last five, once a day (the 06:10 card reuses the 05:00 lines), and each
+newsletter is summarised only once. The same thread-id check applies, and
+nothing in Gmail is changed.
+
 Text is also saved to `var/digests/<date>.txt`. Try it with
 `bin/automations fire morning-summary` (from Termux, not the proot shell).
 

@@ -100,6 +100,7 @@ school = "@school"                    # 🏫 today/tomorrow school items, with l
 noise = "@noise"
 ignore_packages = ["com.google.android.gm"]   # Gmail: its notifications are the summary
 weather = { lat = 32.08, lon = 34.78 }   # your town centre (here Tel Aviv), not your address: a line; a card if out of the ordinary
+# newsletters = "@newsletters"        # 📚 the best of the newsletters under a Gmail label (private.toml [newsletters])
 
 # The same summary as soon as a quiet time ends (private.toml [quiet]; with
 # e.g. shabbat = true, as soon as it ends, worked out each week from [location]).

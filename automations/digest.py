@@ -126,7 +126,7 @@ where <thread id> is the Gmail thread id exactly as the search returned it, and 
 Only report emails you actually read in the search results. If nothing qualifies, output exactly NONE."""
 
 
-def parse_email_items(answer: str, tool_output: str, max_items: int = 5) -> list[dict]:
+def parse_email_items(answer: str, tool_output: str, max_items: int = 5, width: int = 90) -> list[dict]:
     """Claude's answer -> [{thread, line}]; [] for NONE. Each line must be
     "<thread id> | Sender: text" with a thread id that really appeared in the
     Gmail tool output, so nothing made up gets through. Chatter is dropped."""
@@ -139,7 +139,7 @@ def parse_email_items(answer: str, tool_output: str, max_items: int = 5) -> list
             continue
         if not line.partition(":")[2].strip():
             continue
-        items.append({"thread": thread, "line": line if len(line) <= 90 else line[:89].rsplit(" ", 1)[0] + "…"})
+        items.append({"thread": thread, "line": line if len(line) <= width else line[:width - 1].rsplit(" ", 1)[0] + "…"})
     return items[:max_items]
 
 

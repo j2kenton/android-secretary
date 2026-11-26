@@ -97,6 +97,13 @@ family = "family-calendar-id@group.calendar.google.com"
 skip = ["RENEW PASSPORT"]
 days = 90
 
+# Newsletters you mean to read and never do, under one Gmail label (set by a
+# Gmail filter): the morning card gets the few items most worth your time.
+[newsletters]
+label = "Newsletters"
+max_lines = 3
+interests = "front-end developer (React, TypeScript); what changes their day-to-day work"
+
 # Mailing lists read as one daily line instead of email by email.
 [email_lists."green hills"]
 on = false
