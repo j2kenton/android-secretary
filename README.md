@@ -347,7 +347,10 @@ A chat (a person or a group) has one card, listed message by message. A
 message never shows both there and on the summary: once a chat has a card, or
 gets one, all its messages go on it, its earlier summary lines move onto it,
 and the question it asked stays on the card when a passing remark follows. "3 new
-messages" or a bare photo shows only until the chat's first words. Tapping a
+messages" or a bare photo shows only until the chat's first words. A chat
+without a card has one line on the summary, however many messages it sends
+and whenever they come: each new batch is summed up together with the lines
+still showing, and replaces them. Lines already hidden with ✓ stay hidden. Tapping a
 card opens what it's about: the chat, the group, the link.
 
 ## Ensemble

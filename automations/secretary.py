@@ -97,6 +97,11 @@ Be concrete: name the sender, the deadline, the reply to send, the event to crea
 same from a stranger, a business or a page. A tag or mention on social media (Facebook, Instagram, LinkedIn:
 "mentioned you", "tagged you") usually goes to all of someone's followers: ignore it, unless the sender is a
 contact or family.
+"chat": n marks a message in a conversation (the same n, the same chat; oldest first). Unless it needs a card of
+its own (act_now, reply, schedule), give the LAST message of each chat a summary of the conversation so far, up to
+80 chars: what all its messages here say and, when given, "earlier" (what it said before, already summarised and not
+yet read). That one line replaces the earlier ones, so leave nothing of them out that matters; its kind and
+suggestion are for them all.
 """ + owner.VOICE + """
 {judge}"""
 
@@ -227,22 +232,37 @@ def in_contacts(title: str, names: set[str]) -> bool:
 
 
 def triage(rule_names: list[str], model: str = "sonnet", decided: list[str] = (),
-           judge: dict[str, str] | None = None) -> list[dict]:
+           judge: dict[str, str] | None = None, chat_of=None,
+           earlier: dict[str, list[str]] | None = None) -> list[dict]:
     """Triage whatever is queued. Returns the triaged records (empty if nothing was queued).
     On failure the queue is kept for the next run. judge: {package: the owner's
     taste}; those items also get "judged": True and a "keep" (default "card":
-    if Claude gives none, the notification is left alone)."""
+    if Claude gives none, the notification is left alone). chat_of(item): the chat it's
+from (None if it isn't a chat message); earlier: {chat: the summaries of its lines
+still on the card}, which its newest summary takes in."""
     judge = judge or {}
     items = _read(QUEUE)
     if not items:
         return []
     batch = items[:40]
     known = _contacts()
-    listing = "\n".join(json.dumps({"i": i, **{k: it[k] for k in ("app", "title", "text")},
-                                    **({"context": it["context"]} if it.get("context") else {}),
-                                    **({"contact": True} if in_contacts(it.get("title", ""), known) else {}),
-                                    **({"judge": True} if it.get("package") in judge else {})},
-                                   ensure_ascii=False) for i, it in enumerate(batch))
+    earlier = earlier or {}
+    chats: dict[str, int] = {}                  # chat -> its number in the prompt
+    rows = []
+    for i, it in enumerate(batch):
+        row = {"i": i, **{k: it[k] for k in ("app", "title", "text")},
+               **({"context": it["context"]} if it.get("context") else {}),
+               **({"contact": True} if in_contacts(it.get("title", ""), known) else {}),
+               **({"judge": True} if it.get("package") in judge else {})}
+        chat = chat_of(it) if chat_of else None
+        if chat:
+            if chat not in chats:
+                chats[chat] = len(chats) + 1
+                if earlier.get(chat):
+                    row["earlier"] = earlier[chat][-6:]
+            row["chat"] = chats[chat]
+        rows.append(json.dumps(row, ensure_ascii=False))
+    listing = "\n".join(rows)
     judged = {it.get("package") for it in batch} & set(judge)
     taste = "\n".join(f"- {dg.app_name(p)}: {judge[p]}" for p in sorted(judged))
     prompt = PROMPT.format(rules=", ".join(rule_names) or "none", kinds=" | ".join(KINDS), about=owner.about(),

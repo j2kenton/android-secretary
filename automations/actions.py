@@ -723,6 +723,11 @@ def _glanced(r: dict, kind: str = "dismiss") -> bool:
             and not ONE_TIME_CODE.search(text) and not COUNT_HEADER.match(r.get("text") or ""))
 
 
+def _on_summary(r: dict) -> bool:
+    """Whether a record kept for the 🗂 card is shown on it."""
+    return r.get("keep") == "summary" or r.get("kind") in ("later", "automate", "list") or _glanced(r)
+
+
 # Returned by an action whose Claude call failed (its input is kept for the
 # next run): the engine then holds off its "soon" runs for a while.
 FAILED = "failed"
@@ -739,13 +744,21 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
     import tomllib
     names = [r["name"] for r in tomllib.loads(RULES_FILE.read_text(encoding="utf-8")).get("rule", [])
              if r.get("enabled", True) and not r["name"].startswith("secretary")]
+    state = _state if _state is not None else {}
+    seen = summaries.seen("secretary")
+    now = datetime.now().timestamp()
+    earlier: dict[str, list[str]] = {}          # a chat's 🗂 lines not hidden yet: its next summary takes them in
+    for x in reversed(state.get("card", [])):   # oldest first
+        chat = _chat_nid(x)
+        if chat and _on_summary(x) and x.get("ts", 0) >= now - hold_hours * 3600 \
+                and secretary.item_id(x) not in seen:
+            earlier.setdefault(chat, []).append(x.get("summary", ""))
     try:
         records = secretary.triage(names, model, (secretary_cfg or {}).get("decided", []),
-                                   (secretary_cfg or {}).get("judge", {}))
+                                   (secretary_cfg or {}).get("judge", {}), chat_of=_chat_nid, earlier=earlier)
     except claude.ClaudeError as e:
         log.warning("secretary triage failed (queue kept): %s", e)
         return FAILED
-    state = _state if _state is not None else {}
     _booked_check(state, calendars or {})
     listed = _email_lists(email_lists or {}, groups or {}, secretary_cfg or {}, state)
     if not records and not listed:
@@ -783,7 +796,6 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
     book: dict = {}
     folded = set()
     matters: dict[str, list[dict]] = {}
-    seen = summaries.seen("secretary")
     moved = [x for x in reversed(state.get("card", []))       # oldest first
              if _chat_nid(x) in carded - set(chats) and secretary.item_id(x) not in seen]
     if moved:                                   # its earlier 🗂 lines move onto the new card
@@ -811,16 +823,22 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
         matter_card(matter, rs, state["matters"], book, school)
 
     # Everything else: one informational card, newest first, kept for `hold_hours`.
-    now = datetime.now().timestamp()
     rest = [{**r, "ts": now} for r in records if id(r) not in folded and r.get("package") != GMAIL and
             (r.get("keep") == "summary" if r.get("judged") else r["kind"] not in secretary.OWN_CARD)]
-    kept = rest + [r for r in state.get("card", []) if r.get("ts", 0) >= now - hold_hours * 3600
+    # One line per chat: its newest line sums up the chat's lines before it (see triage), which go.
+    last = {}
+    for r in rest:                              # oldest first
+        if _chat_nid(r) and _on_summary(r):
+            last[_chat_nid(r)] = id(r)
+    rest = [r for r in rest if not (_chat_nid(r) in last and _on_summary(r) and id(r) != last[_chat_nid(r)])]
+    old = [x for x in state.get("card", []) if not (_chat_nid(x) in last and _on_summary(x)
+                                                     and secretary.item_id(x) not in seen)]
+    kept = rest + [r for r in old if r.get("ts", 0) >= now - hold_hours * 3600
                    and r.get("package") != GMAIL]          # lines from before email left 🗂 (2026-11-17)
     state["card"] = kept[:30]
     if not rest and not listed and not moved:
         return
-    shown = [r for r in reversed(kept)                                            # oldest first
-             if r.get("keep") == "summary" or r["kind"] in ("later", "automate", "list") or _glanced(r)]
+    shown = [r for r in reversed(kept) if _on_summary(r)]                        # oldest first
     summaries.post("secretary", "🗂 Secretary",
                    [(secretary.item_id(r), secretary.card_lines([r])[0]) for r in shown], nid="secretary")
 
