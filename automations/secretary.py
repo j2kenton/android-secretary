@@ -125,7 +125,8 @@ product role', 'sales role, not engineering'; else empty>".
 - focus: a role that fits them at a top company or one of the same kind, or a role that fits unusually well at a
   good company. Top companies (the highest pay): {top}. Of the same kind: global tech companies and top-paying
   scale-ups with R&D in Israel, including ones that bought an Israeli startup (e.g. PayPal).
-- unlikely: a role that doesn't fit them, or a company they avoid: {avoid}.
+- unlikely: CLEARLY not for them (it's cleared and its email marked read): a role that doesn't fit them, or a
+  company they avoid: {avoid}. If in doubt, maybe.
 - maybe: the rest (a fitting role elsewhere; a role that may fit). Good companies: {good}.
 {notes}A recruiter or anyone else writing to the owner themselves is a message, not a job opening: triage it as usual,
 no "job"."""

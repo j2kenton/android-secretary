@@ -371,11 +371,13 @@ Job openings (LinkedIn job alerts, Greenhouse emails, "X is hiring") are tiered
 against `[secretary.jobs]` in private.toml: what the owner does and which roles
 fit, the top-paying companies, good ones, and ones to avoid. **focus** (a role
 that fits at a top company or one of the same kind) gets a 🟢 card of its own;
-**maybe** is a line on the 💼 Jobs card; **unlikely** (a role that doesn't fit,
-or a company to avoid) is a ⚪ line at its bottom, with the reason. Nothing is
-dropped. The same job from LinkedIn's email and its app counts once, and lines
-stay three days. LinkedIn's own notifications are swiped; Gmail's are left as
-they are.
+**maybe** is a line on the 💼 Jobs card; **unlikely** (clearly not: a role that
+doesn't fit, or a company to avoid) is cleared, and its email marked read (Claude
+finds it in Gmail by sender and first line; an email listing "… and 7 other
+jobs" is left, since it holds jobs nobody judged). The same job from LinkedIn's
+email and its app counts once, and lines stay three days. LinkedIn's own
+notifications are swiped; Gmail's stay, except an unlikely one's once it's read.
+Every verdict is in `var/secretary/triaged.jsonl`.
 
 ## Ensemble
 

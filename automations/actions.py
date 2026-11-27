@@ -23,6 +23,7 @@ from . import paths
 from .paths import VAR
 from . import android
 from . import claude
+from . import jobmail
 from . import digest as dg
 from . import ensemble
 from . import groups as grp
@@ -771,6 +772,7 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
             if not done and r.get("key"):
                 retry_later(r["key"])
     records = _jobs(records, state)
+    _mark_jobs_read(state)
     _cap_to_summary(records, (secretary_cfg or {}).get("summary_max", []))
     _big_transactions(records)
     _check_calendars(records, calendars or {})
@@ -851,11 +853,12 @@ JOB_DAYS = 3          # a job opening stays on 💼 this long (unless hidden wit
 
 def _jobs(records: list[dict], state: dict) -> list[dict]:
     """Job openings (a "job" tier from triage; see [secretary.jobs]) leave the
-    usual flow. focus: a 🟢 card of its own; maybe and unlikely (⚪, last): a
-    line each on the 💼 Jobs card. The same company and role again within
-    JOB_DAYS (LinkedIn's email and its app both say it), or an alert naming no
-    role from a company already there, adds nothing. Their LinkedIn
-    notifications are swiped; Gmail's are left as they are. Returns the rest."""
+    usual flow. focus: a 🟢 card of its own; maybe: a line on the 💼 Jobs card;
+    unlikely (clearly not for the owner): cleared, its email marked read
+    (_mark_jobs_read). The same company and role again within JOB_DAYS
+    (LinkedIn's email and its app both say it), or an alert naming no role
+    from a company already there, adds nothing. Their LinkedIn notifications
+    are swiped; Gmail's stay, except an unlikely one's once it's read. Returns the rest."""
     import hashlib
     now = datetime.now().timestamp()
     jobs = [j for j in state.get("jobs", []) if j.get("ts", 0) >= now - JOB_DAYS * 86400]
@@ -869,30 +872,57 @@ def _jobs(records: list[dict], state: dict) -> list[dict]:
                 and (not role or j.get("role", "").lower() == role.lower())]
         if not same:
             jid = "job-" + hashlib.sha1(f"{company}|{role}".lower().encode()).hexdigest()[:10]
-            job = {"id": jid, "tier": r["job"], "company": company, "role": role, "why": r.get("why", ""),
-                   "app": r.get("app", ""), "ts": now}
-            jobs.append(job)
+            jobs.append({"id": jid, "tier": r["job"], "company": company, "role": role, "why": r.get("why", ""),
+                         "app": r.get("app", ""), "ts": now})
             if r["job"] == "focus":
                 text = "\n".join(x for x in (r.get("why", ""), f"{dg.LTR}{r.get('app', '')} · {r.get('title', '')}") if x)
                 _own_card(jid, f"🟢 {company}: {role or 'new openings'}", text,
                           [(f"Open {r.get('app') or 'app'}", android.cmd_open_app(r.get("package", GMAIL)))],
                           priority="default")
-            else:
-                changed = True
+            changed = True
         if r.get("key") and r.get("package") != GMAIL:
             android.dismiss(r.get("package", ""), r.get("title", ""), r["key"])
+        elif r["job"] == "unlikely" and r.get("key") and _one_job_email(r):
+            state.setdefault("jobs_to_mark", []).append(
+                {"sender": r.get("title", ""), "start": (r.get("text") or "").split("\n")[0][:120], "key": r["key"]})
     if len(jobs) != len(state.get("jobs", [])) or changed:
         state["jobs"] = jobs
         _jobs_card(jobs)
     return rest
 
 
+def _one_job_email(r: dict) -> bool:
+    """An email about one job, not the owner's own snoozed one: marking it read loses nothing
+    ("Via Front-End Engineer and 7 other jobs…" holds jobs triage never saw)."""
+    return not r.get("title", "").startswith("Snoozed:") and not re.search(r"\bother jobs?\b", r.get("text", ""), re.I)
+
+
 def _jobs_card(jobs: list[dict]) -> None:
     def line(j: dict) -> str:
         what = f"{j['company']} · {j['role']}" if j.get("role") else f"{j['company']}: new openings"
-        return ("⚪ " if j["tier"] == "unlikely" else "") + what + (f": {j['why']}" if j.get("why") else "")
-    shown = [j for t in ("maybe", "unlikely") for j in jobs if j["tier"] == t]
-    summaries.post("jobs", "💼 Jobs", [(j["id"], line(j)) for j in shown], nid="jobs")
+        return what + (f": {j['why']}" if j.get("why") else "")
+    summaries.post("jobs", "💼 Jobs", [(j["id"], line(j)) for j in jobs if j["tier"] == "maybe"], nid="jobs")
+
+
+def _mark_jobs_read(state: dict) -> None:
+    """Mark the unlikely job emails read in Gmail, then take their notifications
+    away. One that isn't found or fails is tried at the next two triages, then left."""
+    todo = state.get("jobs_to_mark", [])
+    if not todo:
+        return
+    try:
+        done = set(jobmail.mark_read(todo))
+    except claude.ClaudeError as e:
+        log.warning("job emails: couldn't mark %d read (tried again later): %s", len(todo), e)
+        done = set()
+    for i in sorted(done):
+        android.dismiss(GMAIL, todo[i]["sender"], todo[i]["key"])
+    left = []
+    for i, a in enumerate(todo):
+        if i not in done and a.get("tries", 0) < 2:
+            left.append({**a, "tries": a.get("tries", 0) + 1})
+    state["jobs_to_mark"] = left
+    log.info("job emails: %d marked read, %d left", len(done), len(left))
 
 
 def _email_lists(lists: dict, groups: dict, secretary_cfg: dict, state: dict) -> bool:

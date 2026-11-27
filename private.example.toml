@@ -75,7 +75,7 @@ greetings_only = ["Aunt Vera"]
 summary_max = ["KIDZONE"]
 
 # Job openings (job alerts, "X is hiring"): each gets a tier. focus -> a 🟢 card of its own; maybe -> a line
-# on the 💼 Jobs card; unlikely -> a ⚪ line at its bottom, with the reason. Leave it out for no job handling.
+# on the 💼 Jobs card; unlikely (clearly not) -> cleared, its email marked read. Leave it out for no job handling.
 [secretary.jobs]
 about = """Senior frontend engineer (React, TypeScript). Roles that fit: Senior or Staff Frontend or Fullstack. \
 Roles that don't: backend-only, ML, DevOps, QA, sales or solutions engineer, managers, junior roles."""
