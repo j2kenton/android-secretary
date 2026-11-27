@@ -463,6 +463,8 @@ patterns = ['^WhatsApp\n\d+ messages? from \d+ chats?$',        # summary of mes
 "com.wispr.flowapp" = ['^Text copied to clipboard\n', '^Session ended\n']
 "com.anthropic.claude" = ['^Claude is reading aloud\n']
 "com.google.android.apps.maps" = ['^Updating offline maps\n']
+"com.whatsapp" = ['(?i)^[^\n]*\n(incoming|ongoing) (group )?(voice|video) call$', '(?i)^[^\n]*\n(calling|ringing|reconnecting)(…|\.\.\.)?$']   # a call while it happens: you're on it already; "Missed voice call" still gets a card
+"com.whatsapp.w4b" = ['(?i)^[^\n]*\n(incoming|ongoing) (group )?(voice|video) call$', '(?i)^[^\n]*\n(calling|ringing|reconnecting)(…|\.\.\.)?$']
 # App downloads, installs and updates: no card, no line; left in the shade, they go by themselves.
 "com.android.vending" = ['^[^\n]+\n$',                            # Play Store progress: the app's name, no text
                          '(?i)\b(download(ing|ed)|install(ing|ed)|updat(ing|ed)|updates? available)\b']

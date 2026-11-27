@@ -115,3 +115,18 @@ class ExampleFilesTests(unittest.TestCase):
         settings, rules = load(root / "rules.example.toml", root / "private.example.toml")
         self.assertGreater(len(rules), 20)
         self.assertIn("morning-summary", {r.name for r in rules})
+
+
+class CallNoiseTests(unittest.TestCase):
+    """A WhatsApp call while it rings or runs is never a message to triage (a
+    "💬 Mum · Incoming voice call" card mid-call made no sense); a missed call is."""
+
+    def test_calls_in_progress_are_noise_missed_ones_are_not(self):
+        import tomllib
+        from automations import digest as dg
+        noise = tomllib.loads((Path(__file__).resolve().parent.parent / "rules.example.toml").read_text())["noise"]
+        is_noise = lambda text: dg.is_noise({"packageName": "com.whatsapp", "title": "Mum", "content": text}, noise)
+        for text in ("Incoming voice call", "Ongoing voice call", "Incoming video call", "Calling…", "Ringing…"):
+            self.assertTrue(is_noise(text), text)
+        for text in ("Missed voice call", "Ongoing voice call?? call me back", "I'll call you later"):
+            self.assertFalse(is_noise(text), text)
