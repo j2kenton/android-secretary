@@ -367,6 +367,16 @@ and whenever they come: each new batch is summed up together with the lines
 still showing, and replaces them. Lines already hidden with ✓ stay hidden. Tapping a
 card opens what it's about: the chat, the group, the link.
 
+Job openings (LinkedIn job alerts, Greenhouse emails, "X is hiring") are tiered
+against `[secretary.jobs]` in private.toml: what the owner does and which roles
+fit, the top-paying companies, good ones, and ones to avoid. **focus** (a role
+that fits at a top company or one of the same kind) gets a 🔴 card of its own;
+**maybe** is a line on the 💼 Jobs card; **unlikely** (a role that doesn't fit,
+or a company to avoid) is a ⚪ line at its bottom, with the reason. Nothing is
+dropped. The same job from LinkedIn's email and its app counts once, and lines
+stay three days. LinkedIn's own notifications are swiped; Gmail's are left as
+they are.
+
 ## Ensemble
 
 One card says Ensemble's state first: 🔵 needs you (a card waits, a run was

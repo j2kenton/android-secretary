@@ -755,7 +755,8 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
             earlier.setdefault(chat, []).append(x.get("summary", ""))
     try:
         records = secretary.triage(names, model, (secretary_cfg or {}).get("decided", []),
-                                   (secretary_cfg or {}).get("judge", {}), chat_of=_chat_nid, earlier=earlier)
+                                   (secretary_cfg or {}).get("judge", {}), chat_of=_chat_nid, earlier=earlier,
+                                   jobs=(secretary_cfg or {}).get("jobs"))
     except claude.ClaudeError as e:
         log.warning("secretary triage failed (queue kept): %s", e)
         return FAILED
@@ -769,6 +770,7 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
             secretary.log_judged(r, bool(done))
             if not done and r.get("key"):
                 retry_later(r["key"])
+    records = _jobs(records, state)
     _cap_to_summary(records, (secretary_cfg or {}).get("summary_max", []))
     _big_transactions(records)
     _check_calendars(records, calendars or {})
@@ -844,6 +846,53 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
 
 
 GMAIL = "com.google.android.gm"
+JOB_DAYS = 3          # a job opening stays on 💼 this long (unless hidden with ✓)
+
+
+def _jobs(records: list[dict], state: dict) -> list[dict]:
+    """Job openings (a "job" tier from triage; see [secretary.jobs]) leave the
+    usual flow. focus: a 🔴 card of its own; maybe and unlikely (⚪, last): a
+    line each on the 💼 Jobs card. The same company and role again within
+    JOB_DAYS (LinkedIn's email and its app both say it), or an alert naming no
+    role from a company already there, adds nothing. Their LinkedIn
+    notifications are swiped; Gmail's are left as they are. Returns the rest."""
+    import hashlib
+    now = datetime.now().timestamp()
+    jobs = [j for j in state.get("jobs", []) if j.get("ts", 0) >= now - JOB_DAYS * 86400]
+    rest, changed = [], False
+    for r in records:
+        if not r.get("job") or r.get("judged") or r["kind"] in secretary.OWN_CARD:
+            rest.append(r)
+            continue
+        company, role = r["company"], r.get("role", "")
+        same = [j for j in jobs if j["company"].lower() == company.lower()
+                and (not role or j.get("role", "").lower() == role.lower())]
+        if not same:
+            jid = "job-" + hashlib.sha1(f"{company}|{role}".lower().encode()).hexdigest()[:10]
+            job = {"id": jid, "tier": r["job"], "company": company, "role": role, "why": r.get("why", ""),
+                   "app": r.get("app", ""), "ts": now}
+            jobs.append(job)
+            if r["job"] == "focus":
+                text = "\n".join(x for x in (r.get("why", ""), f"{dg.LTR}{r.get('app', '')} · {r.get('title', '')}") if x)
+                _own_card(jid, f"🔴 {company}: {role or 'new openings'}", text,
+                          [(f"Open {r.get('app') or 'app'}", android.cmd_open_app(r.get("package", GMAIL)))],
+                          priority="default")
+            else:
+                changed = True
+        if r.get("key") and r.get("package") != GMAIL:
+            android.dismiss(r.get("package", ""), r.get("title", ""), r["key"])
+    if len(jobs) != len(state.get("jobs", [])) or changed:
+        state["jobs"] = jobs
+        _jobs_card(jobs)
+    return rest
+
+
+def _jobs_card(jobs: list[dict]) -> None:
+    def line(j: dict) -> str:
+        what = f"{j['company']} · {j['role']}" if j.get("role") else f"{j['company']}: new openings"
+        return ("⚪ " if j["tier"] == "unlikely" else "") + what + (f": {j['why']}" if j.get("why") else "")
+    shown = [j for t in ("maybe", "unlikely") for j in jobs if j["tier"] == t]
+    summaries.post("jobs", "💼 Jobs", [(j["id"], line(j)) for j in shown], nid="jobs")
 
 
 def _email_lists(lists: dict, groups: dict, secretary_cfg: dict, state: dict) -> bool:

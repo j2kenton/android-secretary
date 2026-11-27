@@ -116,6 +116,35 @@ An ad (see above) is "clear" unless it plainly concerns the owner.
 If torn between two, choose the one that keeps more. The owner corrects mistakes either way."""
 
 
+JOBS = """
+The owner is looking for a job. {about}
+A job opening (a job alert, "<company> is hiring", "new opportunities in Israel", a job post) gets kind "later" and
+these fields too: "job": "focus" | "maybe" | "unlikely", "company": "<the company>", "role": "<the role, short,
+as given; empty if none is named>", "why": "<for focus or unlikely: why, under 50 chars, e.g. 'top payer, React
+product role', 'sales role, not engineering'; else empty>".
+- focus: a role that fits them at a top company or one of the same kind, or a role that fits unusually well at a
+  good company. Top companies (the highest pay): {top}. Of the same kind: global tech companies and top-paying
+  scale-ups with R&D in Israel, including ones that bought an Israeli startup (e.g. PayPal).
+- unlikely: a role that doesn't fit them, or a company they avoid: {avoid}.
+- maybe: the rest (a fitting role elsewhere; a role that may fit). Good companies: {good}.
+{notes}A recruiter or anyone else writing to the owner themselves is a message, not a job opening: triage it as usual,
+no "job"."""
+
+JOB_HINT = re.compile(r"job|hiring|opening|opportunit|position|career|recruit|vacanc|משר|דרוש", re.I)
+TIERS = ("focus", "maybe", "unlikely")
+
+
+def jobs_prompt(jobs: dict | None, rows: list[dict]) -> str:
+    """The job-openings part of the prompt, when [secretary.jobs] is set and a row may be one."""
+    if not (jobs and jobs.get("about")) or not any(JOB_HINT.search(f"{r.get('title', '')} {r.get('text', '')}")
+                                                   for r in rows):
+        return ""
+    names = lambda k: ", ".join(jobs.get(k) or []) or "(none given)"
+    notes = "".join(f"{n}\n" for n in jobs.get("notes") or [])
+    return JOBS.format(about=jobs["about"].strip(), top=names("top"), good=names("good"),
+                       avoid=names("avoid"), notes=notes)
+
+
 def _read(path: Path) -> list[dict]:
     if not path.exists():
         return []
@@ -215,6 +244,10 @@ def parse(answer: str, count: int) -> dict[int, dict]:
                     out[i][k] = v[:n]
             if d.get("keep") in KEEPS:
                 out[i]["keep"] = d["keep"]
+            if d.get("job") in TIERS and str(d.get("company") or "").strip():
+                out[i]["job"] = d["job"]
+                for k, n in (("company", 40), ("role", 70), ("why", 70)):
+                    out[i][k] = str(d.get(k) or "").strip()[:n]
     return out
 
 
@@ -233,13 +266,13 @@ def in_contacts(title: str, names: set[str]) -> bool:
 
 def triage(rule_names: list[str], model: str = "sonnet", decided: list[str] = (),
            judge: dict[str, str] | None = None, chat_of=None,
-           earlier: dict[str, list[str]] | None = None) -> list[dict]:
+           earlier: dict[str, list[str]] | None = None, jobs: dict | None = None) -> list[dict]:
     """Triage whatever is queued. Returns the triaged records (empty if nothing was queued).
     On failure the queue is kept for the next run. judge: {package: the owner's
     taste}; those items also get "judged": True and a "keep" (default "card":
     if Claude gives none, the notification is left alone). chat_of(item): the chat it's
 from (None if it isn't a chat message); earlier: {chat: the summaries of its lines
-still on the card}, which its newest summary takes in."""
+still on the card}, which its newest summary takes in. jobs: [secretary.jobs] (job openings get a "job" tier)."""
     judge = judge or {}
     items = _read(QUEUE)
     if not items:
@@ -268,7 +301,8 @@ still on the card}, which its newest summary takes in."""
     prompt = PROMPT.format(rules=", ".join(rule_names) or "none", kinds=" | ".join(KINDS), about=owner.about(),
                            now=datetime.now().strftime("%A %Y-%m-%d %H:%M"),
                            decided="\n".join(f"- {d}" for d in decided) or "(none yet)",
-                           judge=JUDGE.format(taste=taste) if judged else "") + "\n\n" + listing
+                           judge=JUDGE.format(taste=taste) if judged else "") \
+        + jobs_prompt(jobs, batch) + "\n\n" + listing
     ans = claude.ask(prompt, [], model=model, connect_wait=0)
     found = parse(ans.text, len(batch))
     records = [{**it, **found[i]} for i, it in enumerate(batch) if i in found]
