@@ -851,7 +851,7 @@ JOB_DAYS = 3          # a job opening stays on 💼 this long (unless hidden wit
 
 def _jobs(records: list[dict], state: dict) -> list[dict]:
     """Job openings (a "job" tier from triage; see [secretary.jobs]) leave the
-    usual flow. focus: a 🔴 card of its own; maybe and unlikely (⚪, last): a
+    usual flow. focus: a 🟢 card of its own; maybe and unlikely (⚪, last): a
     line each on the 💼 Jobs card. The same company and role again within
     JOB_DAYS (LinkedIn's email and its app both say it), or an alert naming no
     role from a company already there, adds nothing. Their LinkedIn
@@ -874,7 +874,7 @@ def _jobs(records: list[dict], state: dict) -> list[dict]:
             jobs.append(job)
             if r["job"] == "focus":
                 text = "\n".join(x for x in (r.get("why", ""), f"{dg.LTR}{r.get('app', '')} · {r.get('title', '')}") if x)
-                _own_card(jid, f"🔴 {company}: {role or 'new openings'}", text,
+                _own_card(jid, f"🟢 {company}: {role or 'new openings'}", text,
                           [(f"Open {r.get('app') or 'app'}", android.cmd_open_app(r.get("package", GMAIL)))],
                           priority="default")
             else:

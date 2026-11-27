@@ -1,4 +1,4 @@
-"""Job openings get a tier from [secretary.jobs]: focus -> a 🔴 card of its own,
+"""Job openings get a tier from [secretary.jobs]: focus -> a 🟢 card of its own,
 maybe -> a line on 💼 Jobs, unlikely -> a ⚪ line at the bottom. The same job
 from LinkedIn's email and its app counts once."""
 
@@ -34,7 +34,7 @@ class JobsTests(unittest.TestCase):
             rec("Snowflake", "Senior Solution Engineer", "unlikely", why="sales role"),
             rec("Buildots", "Senior Frontend Engineer", "maybe")], {})
         self.assertEqual(notify.call_count, 1)
-        self.assertEqual(notify.call_args.args[0], "🔴 Meta: Software Engineer, Product")
+        self.assertEqual(notify.call_args.args[0], "🟢 Meta: Software Engineer, Product")
         self.assertIn("top payer", notify.call_args.args[1])
         self.assertEqual(posts["jobs"], ["Buildots · Senior Frontend Engineer",
                                          "⚪ Snowflake · Senior Solution Engineer: sales role"])

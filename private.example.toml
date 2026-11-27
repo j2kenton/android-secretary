@@ -74,7 +74,7 @@ decided = ["Calendar: nothing is ever added by itself; things to schedule are ch
 greetings_only = ["Aunt Vera"]
 summary_max = ["KIDZONE"]
 
-# Job openings (job alerts, "X is hiring"): each gets a tier. focus -> a 🔴 card of its own; maybe -> a line
+# Job openings (job alerts, "X is hiring"): each gets a tier. focus -> a 🟢 card of its own; maybe -> a line
 # on the 💼 Jobs card; unlikely -> a ⚪ line at its bottom, with the reason. Leave it out for no job handling.
 [secretary.jobs]
 about = """Senior frontend engineer (React, TypeScript). Roles that fit: Senior or Staff Frontend or Fullstack. \
