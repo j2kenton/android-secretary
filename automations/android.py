@@ -281,7 +281,8 @@ def cmd_open_dev_settings() -> str:
 # Tasker profile "Intent Received: phoneautomations.MARK_READ" runs AutoNotification
 # Actions with Button Text Filter %button, Package Name Filter %app, Title Filter %chat.
 MARK_READ_BUTTON = {"com.whatsapp": "Mark as read", "org.telegram.messenger": "Mark as Read",
-                    "com.samsung.android.messaging": "Mark as read"}
+                    "com.samsung.android.messaging": "Mark as read",
+                    "com.zoho.mail": "Mark as read"}     # pressed only when that email's notification has it
 
 
 def chat_filter(title: str) -> str:

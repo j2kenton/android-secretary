@@ -848,6 +848,7 @@ def secretary_triage(event, model: str = "sonnet", hold_hours: float = 12,
 
 
 GMAIL = "com.google.android.gm"
+ZOHO = "com.zoho.mail"
 JOB_DAYS = 3          # a job opening stays on 💼 this long (unless hidden with ✓)
 
 
@@ -1862,6 +1863,9 @@ def clear_noise(event, clear: dict | None = None, **_):
     if n["packageName"] in android.NEVER_SNOOZE:      # would hide the chats' later messages
         return
     if n["packageName"] in SMS_APPS:                  # a conversation: marked read, never snoozed
+        _clear(event)
+        return
+    if n["packageName"] == ZOHO:                      # an email: its "Mark as read", else snoozed
         _clear(event)
         return
     if android.snooze(event["key"]):

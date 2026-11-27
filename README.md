@@ -324,7 +324,9 @@ Watched messages are cleared by pressing the notification's own "Mark as read"
 (the chat is marked read in WhatsApp/Telegram), with a snooze (adb) as the
 fallback when the notification is still there 4 seconds later. The phone side
 sends `am broadcast -a phoneautomations.MARK_READ --es app <package> --es chat
-<title filter> --es button <button text>`. Tasker setup (once):
+<title filter> --es button <button text>`. A Zoho Mail email that a `[clear]`
+entry matches gets the same: its notification's "Mark as read" when it has one,
+else a snooze. Tasker setup (once):
 
 - Profile: Event → System → Intent Received, Action `phoneautomations.MARK_READ`
 - Task "Mark read": Plugin → AutoNotification → Actions, with Button Text Filter

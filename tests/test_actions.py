@@ -238,6 +238,38 @@ class TapOpensChatTests(unittest.TestCase):
             self.assertEqual(actions._open_group_button({"group": "G"})[0], "💬 Open chat")
 
 
+class ZohoNoiseMarkedReadTests(unittest.TestCase):
+    """A noise email in Zoho (Facebook's reminders) is marked read with its
+    notification's own button; without one it is only snoozed."""
+    KEY = "0|com.zoho.mail|42171863|Zoho Mail|10061"
+    CLEAR = {"by_package": {"com.zoho.mail": ["^(friendsuggestion|reminders)@facebookmail\\.com\\n"]}}
+
+    def run_clear(self, title, live_after_press):
+        ev = {"key": self.KEY, "package": "com.zoho.mail", "title": title, "body": "You have 7 notifications"}
+        lives = iter([[{"key": self.KEY}], live_after_press])
+        with mock.patch.object(actions.android, "notifications", side_effect=lambda: next(lives, live_after_press)), \
+             mock.patch.object(actions.android, "notification_actions", return_value=["Mark as read", "Delete"]), \
+             mock.patch.object(actions.android, "_run") as run, \
+             mock.patch.object(actions.android, "snooze", return_value=True) as snooze, \
+             mock.patch("time.sleep"):
+            actions.clear_noise(ev, clear=self.CLEAR)
+        return run, snooze
+
+    def test_pressed_mark_as_read(self):
+        run, snooze = self.run_clear("reminders@facebookmail.com", [])
+        self.assertIn("Mark as read", run.call_args.args[0])
+        snooze.assert_not_called()
+
+    def test_still_there_is_snoozed(self):
+        _run, snooze = self.run_clear("reminders@facebookmail.com", [{"key": self.KEY}])
+        snooze.assert_called_once_with(self.KEY)
+
+    def test_other_mail_untouched(self):
+        run, snooze = self.run_clear("security@facebookmail.com", [])
+        run.assert_not_called()
+        snooze.assert_not_called()
+
+
 class SmsNeverSnoozedTests(unittest.TestCase):
     """An SMS notification is the whole conversation: a snoozed promo would hide
     the sender's next SMS (an CardCo transaction alert). Marked read, or left."""
